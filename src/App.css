@@ -18,13 +18,32 @@
   margin-right: 50px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
-
+.back-button {
+  font-family: "Times New Roman", Times, serif; 
+  font-weight: bold;   
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007BFF;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+.import-button {
+  font-family: "Times New Roman", Times, serif;
+  font-weight: bold;      
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #28A745;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
 .card {
   background: #e2e8f0;
   padding: 20px;
   border-radius: 25px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 400px;
+  width: 500px;
   text-align: center;
 }
 
@@ -58,14 +77,10 @@ input {
   justify-content: space-evenly;
   margin: 15px 25px;
   text-align: center;
+  align-items: center;
+  gap: 15px;
   font-family: "Times New Roman", Times, serif;
   font-weight: bold;
-}
-
-.checkbox-group-1 label {
-  display: flex;
-  align-items: center;
-  gap: 5px; /* Adjust spacing between checkbox and text */
 }
 
 .checkbox-group-2 {
