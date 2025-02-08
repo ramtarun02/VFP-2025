@@ -1,70 +1,50 @@
-// import logo from './logo.svg';
-import { useState } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
 import "./App.css";
 
-export default function App() {
-  const [mach, setMach] = useState("");
-  const [aoa, setAoA] = useState("");
-  const [reynolds, setReynolds] = useState("");
-  const [continuation, setContinuation] = useState(false);
-  const [autoRunner, setAutoRunner] = useState(false);
-  const [mapImported, setMapImported] = useState(false);
-  const [geoImported, setGeoImported] = useState(false);
-  const [datImported, setDatImported] = useState(false);
-
-
-
+function App() {
   return (
-    <div className="container">
-      <div className="left-panel">
-        <button className="back-button">Back to Main Module</button>
-        <button className="import-button">Import Files</button>
-        <div className="checkbox-group-1">
-         <label>
-            <input type="checkbox" checked={geoImported} onChange={() => setGeoImported(!geoImported)} />
-            GEO Imported
-          </label>
-          <label>
-            <input type="checkbox" checked={mapImported} onChange={() => setMapImported(!mapImported)} />
-            MAP Imported
-          </label>
-          <label>
-            <input type="checkbox" checked={datImported} onChange={() => setDatImported(!datImported)} />
-            DAT Imported
-          </label>
-        </div>
+    <div className="landing-container">
+      <h1 className="title">Viscous Full Potential Flow Solver</h1>
+      
+      {/* Placeholder for Main Image */}
+      {/* <div className="main-image-container"> */}
+      {/*   <img src="/path/to/main-image.png" alt="Main Model" className="main-image" /> */}
+      {/* </div> */}
+      {/*  */}
+      {/* Cranfield University Logo & Instructions Button */}
+      <div className="logo-container">
+        <img src="cranfield-logo.svg" alt="Cranfield University Logo" className="logo" />
+        {/*<button className="instructions-button">Instructions/Manual</button>*/}
       </div>
-      <div className="card">
-        <h2>Flow Conditions and Solver Parameters</h2>
+      
+      {/* Module Sections */}
+      <div className="modules-grid">
+        {/* Geometry Module */}
+        <Link to="/geometry" className="module">
+          <img src="Geometry.png" alt="Geometry Module" className="module-image" />
+          <p className="module-title">GEOMETRY MODULE</p>
+        </Link>
         
-        <div className="input-group">
-          <label>Mach Number</label>
-          <input value={mach} onChange={(e) => setMach(e.target.value)} />
-          
-          <label>Angle of Attack</label>
-          <input value={aoa} onChange={(e) => setAoA(e.target.value)} />
-          
-          <label>Reynolds Number</label>
-          <input value={reynolds} onChange={(e) => setReynolds(e.target.value)} />
-        </div>
-
-        <div className="checkbox-group-2">
-          <label>
-            <input type="checkbox" checked={continuation} onChange={() => setContinuation(!continuation)} />
-            Continuation Run
-          </label>
-          
-          <label>
-            <input type="checkbox" checked={autoRunner} onChange={() => setAutoRunner(!autoRunner)} />
-            Auto-Runner
-          </label>
-        </div>
-
-        <div className="button-group">
-          <button className="run-button"><span>Run VFP </span></button>
-        </div>
+        {/* Run VFP Solver */}
+        <Link to="/run-solver" className="module">
+          <img src="solver.PNG" alt="Run VFP Solver" className="module-image" />
+          <p className="module-title">RUN VFP SOLVER</p>
+        </Link>
+        
+        {/* Post Processing Module */}
+        <Link to="/post-processing" className="module">
+          <img src="postprocess.png" alt="Post Processing Module" className="module-image" />
+          <p className="module-title">POST PROCESSING MODULE</p>
+        </Link>
       </div>
+      
+      {/* Footer */}
+      <p className="footer-text">Developed by the Applied Aerodynamics Group</p>
     </div>
   );
-}
+};
+
+
+export default App;
 
