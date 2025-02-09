@@ -1,8 +1,10 @@
  // import logo from './logo.svg';
 import { useState } from "react";
-import "./App.css";
+import { useNavigate } from "react-router-dom"; 
+import "./RunSolver.css";
 
-export default function App() {
+
+function RunSolver() {
   const [mach, setMach] = useState("");
   const [aoa, setAoA] = useState("");
   const [reynolds, setReynolds] = useState("");
@@ -12,12 +14,12 @@ export default function App() {
   const [mapImported, setMapImported] = useState(false);
   const [geoImported, setGeoImported] = useState(false);
   const [datImported, setDatImported] = useState(false);
-
+  const navigate = useNavigate();
 
   return (
     <div className="container">
       <div className="left-panel">
-        <button className="back-button">Back to Main Module</button>
+        <button className="back-button"  onClick={() => navigate("/")}>Back to Main Module</button>
         <button className="import-button">Import Files</button>
         <div className="checkbox-group-1">
          <label>
@@ -73,4 +75,21 @@ export default function App() {
     </div>
   );
 }
+
+export default RunSolver;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
