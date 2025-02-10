@@ -1,10 +1,9 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Routers, Routes, Route } from "react-router-dom";
 import LandingPage from "./components/LandingPage";
 import GeometryModule from "./components/GeometryModule";
 import RunSolver  from "./components/RunSolver";
 import PostProcessing from "./components/PostProcessing";
-import "./App.css";
 
 function App() {
   return (

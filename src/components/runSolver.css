@@ -1,23 +1,47 @@
 /* App.css */
 .container {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   background: f3f4f6;
   /*background: linear-gradient(180deg, rgba(2,0,36,1) 0%, rgba(0,0,0,1) 18%, rgba(0,212,255,1) 100%);*/
   align-items: center;
   justify-content: center;
 }
-
-.left-panel {
+.merged-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 500px; /* Ensuring both panels merge seamlessly */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.top-panel {
+  width: 500px;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 20px;
   background: #e2e8f0;
-  border-radius: 25px;
-  margin-right: 50px;
+  border-top-left-radius: 25px;
+  border-top-right-radius: 25px;
+  border-bottom-left-radius: 0px;
+  border-bottom-right-radius: 0px;
+ /*  margin-right: 50px; */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
+
+.card {
+  background: #e2e8f0;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 500px;
+  text-align: center;
+  border-top-left-radius: 0px;
+  border-top-right-radius: 0px;
+  border-bottom-left-radius: 25px;
+  border-bottom-right-radius: 25px;
+}
+
 .back-button {
   font-family: "Times New Roman", Times, serif; 
   font-weight: bold;   
@@ -38,19 +62,17 @@
   border: none;
   cursor: pointer;
 }
-.card {
-  background: #e2e8f0;
-  padding: 20px;
-  border-radius: 25px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 500px;
-  text-align: center;
-}
 
-h2 {
-  color: #2563eb;
-  margin-bottom: 20px;
+.title-solver {
+  position: absolute;
+  top: 40px; /* Adjusts vertical position */
+  left: 50%;
+  transform: translateX(-50%);
   font-family: "Times New Roman", Times, serif;
+  font-size: 36px;
+  font-weight: bold;
+  color: #1e40af; /* Same as your blue headings */
+  text-align: center;
 }
 
 .input-group {
