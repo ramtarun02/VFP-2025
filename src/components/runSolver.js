@@ -15,6 +15,29 @@ function RunSolver() {
   const [geoImported, setGeoImported] = useState(false);
   const [datImported, setDatImported] = useState(false);
   const navigate = useNavigate();
+
+
+  const handleSubmit = async () => {
+    console.log("Form Data Submitted:", {mach, aoa, reynolds, continuation, excrescence}); // ✅ Debugging: See form data before sending
+
+    try {
+      const response = await fetch("http://127.0.0.1:5000/run-vfp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({mach, aoa, reynolds, continuation, excrescence}),
+      });
+
+      const result = await response.json();
+      console.log("Server Response:", result);
+      navigate("/results", { state: { result } }); // ✅ Navigate to new page with response
+    } catch (error) {
+      console.error("Error submitting form:", error);
+    }
+  };
+
+
   return (
     <div className="container">
       <div class="merged-container"> 
@@ -73,7 +96,7 @@ function RunSolver() {
           </div>
 
           <div className="button-group">
-            <button className="run-button"><span>Run VFP </span></button>
+            <button className="run-button" onClick={handleSubmit} ><span>Run VFP </span></button>
           </div>
         </div>
 
