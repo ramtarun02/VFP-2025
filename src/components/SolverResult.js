@@ -13,7 +13,7 @@ const ResultsPage = () => {
     <div>
       <h1>Simulation Results</h1>
       <pre>{JSON.stringify(result, null, 2)}</pre> {/* ✅ Display data */}
-      <button onClick={() => navigate("/")}>Back to Form</button>
+      <button onClick={() => navigate("/run-solver")}>Back to Form</button>
     </div>
   );
 };

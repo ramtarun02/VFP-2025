@@ -7,7 +7,7 @@ CORS(app)  # Enable CORS for frontend requests
 @app.route('/run-vfp', methods=['POST'])
 def run_vfp():
     data = request.json  # Get form data from frontend
-
+    print(data['continuation'])
     # Construct a response that echoes back all user inputs
     response = {
         "message": "VFP Run Successful! Here are your inputs:",
