@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter as Routers, Routes, Route } from "react-router-dom";
 import LandingPage from "./components/LandingPage";
 import GeometryModule from "./components/GeometryModule";
-import RunSolver  from "./components/RunSolver";
+import RunSolver  from "./components/runSolver";
 import SolverResult from "./components/SolverResult"
 import PostProcessing from "./components/PostProcessing";
 

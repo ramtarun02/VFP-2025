@@ -1,7 +1,7 @@
  // import logo f▏rom './logo.svg';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom"; 
-import "./RunSolver.css";
+import "./runSolver.css";
 
 
 function RunSolver() {
