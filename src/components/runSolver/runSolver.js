@@ -1,5 +1,5 @@
  // import logo f▏rom './logo.svg';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; 
 import "./runSolver.css";
 import DragNDrop from "./DragNDrop";
@@ -40,11 +40,23 @@ function RunSolver() {
     }
   };
 
+
+  // Update checkboxes based on selected files
+  useEffect(() => {
+    setMapImported(selectedFiles.some(file => file.name.endsWith(".map")));
+    setGeoImported(selectedFiles.some(file => file.name.endsWith(".GEO")));
+    setDatImported(selectedFiles.some(file => file.name.endsWith(".dat")));
+  }, [selectedFiles]);
+
 return (
   <div className="container">
     <div className="top-panel">
       <button className="back-button" onClick={() => navigate("/")}>Back to Main Module</button>
-      <button className="import-button">Import Files</button>
+      {/* <button className="import-button">Import Files</button> */}
+
+     <div className="drag-drop-container"> 
+        <DragNDrop onFilesSelected={setSelectedFiles} width="100%"/>     
+      </div>
 
 
       <div className="checkbox-group-1">
@@ -62,9 +74,6 @@ return (
         </label>
       </div>
 
-      <div className="drag-drop-container"> 
-        <DragNDrop onFilesSelected={setSelectedFiles} width="100%"/>     
-      </div>
       
     </div>
 
