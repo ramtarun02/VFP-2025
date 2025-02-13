@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom"; 
 import "./runSolver.css";
-
+import DragNDrop from "./DragNDrop";
 
 function RunSolver() {
   const [mach, setMach] = useState("");
@@ -14,6 +14,8 @@ function RunSolver() {
   const [mapImported, setMapImported] = useState(false);
   const [geoImported, setGeoImported] = useState(false);
   const [datImported, setDatImported] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+
   const navigate = useNavigate();
 
 
@@ -98,6 +100,10 @@ function RunSolver() {
           <div className="button-group">
             <button className="run-button" onClick={handleSubmit} ><span>Run VFP </span></button>
           </div>
+        </div>
+
+        <div className="drag-drop-container">
+          <DragNDrop onFilesSelected={setSelectedFiles} width="100%" height="200px" />
         </div>
 
       </div>
