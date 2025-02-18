@@ -1,0 +1,88 @@
+/* Results.css */
+
+/* General page styling */
+.results-container {
+    font-family: 'Arial', sans-serif;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Header styling */
+.results-title {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+/* Styling for sections */
+.results-section {
+    background: white;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Key-value pairs in results */
+.result-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.result-item:last-child {
+    border-bottom: none;
+}
+
+/* Labels */
+.result-label {
+    font-weight: bold;
+    color: #555;
+}
+
+/* Values */
+.result-value {
+    color: #007bff;
+}
+
+/* Uploaded Files Styling */
+.files-list {
+    list-style: none;
+    padding: 0;
+}
+
+.file-item {
+    padding: 8px;
+    background: #e9f5ff;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+/* Button styling */
+.back-button {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: #007bff;
+    color: white;
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    text-decoration: none;
+    margin-top: 20px;
+    transition: background 0.3s;
+}
+
+.back-button:hover {
+    background: #0056b3;
+}
+

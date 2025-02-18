@@ -19,28 +19,41 @@ function RunSolver() {
 
   const navigate = useNavigate();
 
+const handleSubmit = async () => {
+  console.log("Form Data Submitted:", { selectedFiles, mach, aoa, reynolds, continuation, excrescence });
 
-  const handleSubmit = async () => {
-    console.log("Form Data Submitted:", {selectedFiles}); // ✅ Debugging: See form data before sending
+  try {
+    const formData = new FormData();
+    
+    // Append text fields
+    formData.append("mach", mach);
+    formData.append("aoa", aoa);
+    formData.append("reynolds", reynolds);
+    formData.append("continuation", continuation);
+    formData.append("excrescence", excrescence);
+    formData.append("autoRunner", autoRunner);
+    formData.append("mapImported", mapImported);
+    formData.append("geoImported", geoImported);
+    formData.append("datImported", datImported);
+    formData.append("simName", simName);
 
-    try {
-      const response = await fetch("http://127.0.0.1:5000/run-vfp", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({mach, aoa, reynolds, continuation, excrescence}),
-      });
+    // Append files
+    selectedFiles.forEach((file, index) => {
+      formData.append(`file_${index}`, file);
+    });
 
-      const result = await response.json();
-      console.log("Server Response:", result);
-      navigate("/results", { state: { result } }); // ✅ Navigate to new page with response
-    } catch (error) {
-      console.error("Error submitting form:", error);
-    }
-  };
+    const response = await fetch("http://127.0.0.1:5000/run-vfp", {
+      method: "POST",
+      body: formData, // No need for headers; browser sets `multipart/form-data`
+    });
 
-
+    const result = await response.json();
+    console.log("Server Response:", result);
+    navigate("/results", { state: { result } }); // ✅ Navigate to results page with response
+  } catch (error) {
+    console.error("Error submitting form:", error);
+  }
+};
   // Update checkboxes based on selected files
   useEffect(() => {
     setMapImported(selectedFiles.some(file => file.name.endsWith(".map")));
