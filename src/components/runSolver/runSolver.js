@@ -19,8 +19,7 @@ function RunSolver() {
 
   const navigate = useNavigate();
 
-const handleSubmit = async () => {
-  console.log("Form Data Submitted:", { selectedFiles, mach, aoa, reynolds, continuation, excrescence });
+  const handleSubmit = async () => {
 
   try {
     const formData = new FormData();
@@ -44,16 +43,19 @@ const handleSubmit = async () => {
 
     const response = await fetch("http://127.0.0.1:5000/run-vfp", {
       method: "POST",
-      body: formData, // No need for headers; browser sets `multipart/form-data`
+      body: formData, // No need for headers; browser sets `multipart/form-data
+      mode: "cors"
     });
 
     const result = await response.json();
     console.log("Server Response:", result);
     navigate("/results", { state: { result } }); // ✅ Navigate to results page with response
+    console.log("Form Data Submitted:", { selectedFiles, mach, aoa, reynolds, continuation, excrescence });
   } catch (error) {
     console.error("Error submitting form:", error);
   }
 };
+
   // Update checkboxes based on selected files
   useEffect(() => {
     setMapImported(selectedFiles.some(file => file.name.endsWith(".map")));
@@ -126,7 +128,7 @@ return (
       </div>
 
       <div className="button-group">
-        <button className="run-button" onClick={handleSubmit}><span>Run VFP </span></button>
+        <button className="run-button" onClick={handleSubmit}><span>Start VFP </span></button>
       </div>
     </div>
 

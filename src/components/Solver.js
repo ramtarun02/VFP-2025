@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import "./SolverResult.css"; // Import the CSS file
+import "./Solver.css"; // Import the CSS file
 
 const Results = () => {
     const location = useLocation();
@@ -14,7 +14,7 @@ const Results = () => {
             <div className="results-section">
                 <h2>Simulation Parameters</h2>
                 <div className="result-item">
-                    <span className="result-label">Mach Number:</span>
+                    <span className="result-label">Mach:</span>
                     <span className="result-value">{result.user_inputs?.mach}</span>
                 </div>
                 <div className="result-item">
@@ -29,7 +29,7 @@ const Results = () => {
 
             <div className="results-section">
                 <h2>Boolean Parameters</h2>
-                {["Continuation", "Excrescence", "AutoRunner", "Map File", "Geometry File", "Flow File"].map(
+                {["continuation", "excrescence", "autoRunner", "Map File Imported", "Geometry File Imported", "Flow File Imported"].map(
                     (key) => (
                         <div key={key} className="result-item">
                             <span className="result-label">{key.replace(/([A-Z])/g, " $1")}</span>
@@ -52,7 +52,7 @@ const Results = () => {
                 </ul>
             </div>
 
-            <a href="/" className="back-button">Go Back</a>
+            <a className="back-button" onClick={() => navigate("/run-solver")}>Go Back</a>
         </div>
     );
 };
