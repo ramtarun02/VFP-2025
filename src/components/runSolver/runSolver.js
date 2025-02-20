@@ -41,7 +41,7 @@ function RunSolver() {
       formData.append(`file_${index}`, file);
     });
 
-    const response = await fetch("http://127.0.0.1:5001/start-vfp", {
+    const response = await fetch("https://c7b8-138-250-27-38.ngrok-free.app/start-vfp", {
       method: "POST",
       body: formData, // No need for headers; browser sets `multipart/form-data
       mode: "cors"
