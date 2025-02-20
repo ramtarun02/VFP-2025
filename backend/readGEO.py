@@ -95,4 +95,4 @@ def readGEO(filename):
 
     return Sections
 
-print(readGEO("CRM1wbs.GEO")[10]['US'])
+# print(readGEO("CRM1wbs.GEO")[10]['US'])
