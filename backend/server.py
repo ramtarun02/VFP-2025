@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
 import time
+import shutil
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend requests
@@ -87,6 +88,19 @@ def start_simulation():
 def handle_disconnect():
     print("Client disconnected")
 
+@app.route('/download-zip', methods=['GET'])
+def download_zip():
+    sim_name = session.get("simName")
+    if not sim_name:
+        return jsonify({"error": "Simulation name not found in session"}), 400
+
+    # zip_filename = f"{sim_name}.zip"
+    # if not os.path.exists(zip_filename):
+    #     return jsonify({"error": "Requested ZIP file not found"}), 404
+
+    return send_file(shutil.make_archive(sim_name, format='zip'), as_attachment=True)
+
+
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=False, log_output=True)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=False, log_output=True, allow_unsafe_werkzeug=True)
 
