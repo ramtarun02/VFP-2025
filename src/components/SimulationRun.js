@@ -15,7 +15,7 @@ const SimulationRun = ({ onClose }) => {
       return;
     }
 
-    const newSocket = io("http://localhost:5001", {
+    const newSocket = io("https://a6f4-138-250-27-20.ngrok-free.app", {
       transports: ["websocket"], // Ensure WebSocket connection is used
     });
 
@@ -58,7 +58,7 @@ const SimulationRun = ({ onClose }) => {
       const formObject = Object.fromEntries(formData.entries());
 
       try {
-        const response = await fetch("http://localhost:5001/download-zip", {
+        const response = await fetch("https://a6f4-138-250-27-20.ngrok-free.app/download-zip", {
         method: "POST",
         body: formObject, // Send entire form data
       });
