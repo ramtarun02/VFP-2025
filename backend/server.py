@@ -1,23 +1,23 @@
-from flask import Flask, request, jsonify, session, send_file
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from flask_session import Session
 from flask_socketio import SocketIO, emit
 import os
 import shutil
+import subprocess
 import runVFP as run
-
 
 app = Flask(__name__)
 CORS(app)
 
-# Secret key for signing session cookies (required for Flask sessions)
-app.config['SECRET_KEY'] = 'mysecret'
-app.config['SESSION_TYPE'] = 'filesystem'
+# # Secret key for signing session cookies (required for Flask sessions)
+# app.config['SECRET_KEY'] = 'mysecret'
+# app.config['SESSION_TYPE'] = 'filesystem'
 
-# Initialize the session
-Session(app)
+
+# # Initialize the session
+# Session(app)
 # Change to manage_session=False to manually handle sessions
-socketio = SocketIO(app, manage_session=True, cors_allowed_origins="*")
+socketio = SocketIO(app, manage_session=True, cors_allowed_origins = '*')
 
 
 @app.route('/start-vfp', methods=['POST'])
@@ -117,12 +117,56 @@ def start_simulation(data=None):
 
             # Retrieve the simulation name directly from the received form data
             sim_name = data['simName']
-            sim_folder = os.path.join("./Simulations/", sim_name)
+            sim_folder = os.path.join("Simulations/", sim_name)
             print(f"Simulation started for: {sim_name}")
+
+            script_dir = os.path.dirname(os.path.abspath(__file__))  # Get the current script's directory
+            bat_file_path = os.path.join(script_dir, sim_name, "run_vfp.bat")  # Adjust subdir name
+
+
             emit('message', f"Simulation started for {sim_name}")
+
             emit('message', run.copy_files_to_folder(sim_folder))
 
-            run.create_batch_file(map_file, geo_file, dat_file, exc, con, sim_folder)
+            try:
+                run.create_batch_file(map_file, geo_file, dat_file, exc, con, sim_folder)
+                emit('message', "Batch File Created Successfully. Attempting to Run the VFP.exe")
+
+            except Exception as e:
+                emit('message', f'Error: {str(e)}')
+
+
+
+            # bat_file_path = os.path.join(sim_folder, "run_vfp.bat")
+
+
+            try:
+                # Execute the batch file and capture output in real-time
+                process = subprocess.Popen(bat_file_path, shell= True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+                # Read and print output in real-time
+                while True:
+                    output = process.stdout.readline()
+                    if output == "" and process.poll() is not None:
+                        break
+                    if output:
+                        print(output.strip())
+                        emit('message', output.strip())
+
+                # Emit any error messages if necessary
+                for line in iter(process.stderr.readline, ''):
+                    emit('message', line.strip())
+
+                # Wait for the process to finish
+                process.stdout.close()
+                process.stderr.close()
+                process.wait()
+
+                # Emit a final message once the batch file execution completes
+                emit('message', 'Simulation completed successfully!')
+
+            except Exception as e:
+                emit('message',  f'Error: {str(e)}')
 
         except Exception as e:
             print(f"Error processing simulation data: {e}")
@@ -166,5 +210,4 @@ def download_zip():
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=False, log_output=True,
-                 allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
