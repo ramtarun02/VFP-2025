@@ -19,6 +19,11 @@ const Results = () => {
 
             <div className="results-section">
                 <div className="result-item">
+                    <span className="result-label">Simulation Name:</span>
+                    <span className="result-value">{result.user_inputs?.simName}</span>
+                </div>
+ 
+                <div className="result-item">
                     <span className="result-label">Mach Number:</span>
                     <span className="result-value">{result.user_inputs?.mach}</span>
                 </div>

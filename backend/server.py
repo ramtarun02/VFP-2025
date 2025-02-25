@@ -7,7 +7,6 @@ import shutil
 import runVFP as run
 
 
-
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend requests
 
@@ -49,7 +48,6 @@ def run_vfp():
             file_path = os.path.join(UPLOAD_FOLDER, file.filename)
             file.save(file_path)  # Save file
             files_received[file_key] = file.filename  # Store file names
-
     # Construct a response
     response = {
         "message": "VFP Run Successful! Here are your inputs:",

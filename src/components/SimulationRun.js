@@ -1,48 +1,79 @@
-import React, { useState, useEffect } from "react";
-import "./SimulationRun.css";
-import { io } from 'socket.io-client';
-
+import { useState, useEffect } from "react";
+import { io } from "socket.io-client";
+import "./SimulationRun.css"
 
 const SimulationRun = ({ onClose }) => {
   const [messages, setMessages] = useState([]);
-  const socket = io("https://c7b8-138-250-27-38.ngrok-free.app");
+  const [socket, setSocket] = useState(null); // Store socket in state
+
+  function getSessionId() {
+    const cookies = document.cookie.split(';');
+    for (let i=0; i<cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.startsWith('session=')) {
+        return cookie.substring('session='.length);
+      }
+    }
+    return null;
+  }
+
   useEffect(() => {
-  socket.on("connect", () => {
-    console.log("WebSocket connected");
-    socket.emit("start_simulation"); // Trigger simulation on connect
-  });
+    const newSocket = io("https://d820-138-250-27-20.ngrok-free.app ");
+    
 
-  socket.on("message", (data) => {
-    setMessages((prev) => [...prev, data]);
-  });
+    const sessionId = getSessionId();
 
-  socket.on("disconnect", () => {
-    console.log("WebSocket disconnected");
-  });
+    newSocket.on("connect", () => {
+      console.log("WebSocket connected");
+      newSocket.emit("start_simulation", {
+        session_id: sessionId
+      }); // Trigger simulation on connect
 
-  return () => {
-    socket.disconnect();
-  };
-}, []);
 
-const handleDownload = async () => { 
-  try {             
-        const response = await fetch('https://c7b8-138-250-27-38.ngrok-free.app/download-zip');
-        if (!response.ok) {
-            throw new Error('Failed to download file');
-            }
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'simulation.zip'; // Change filename if needed
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url); 
+    });
+
+    newSocket.on("message", (data) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
+    newSocket.on("disconnect", () => {
+      console.log("WebSocket disconnected");
+    });
+
+    setSocket(newSocket); // Save socket instance
+
+    return () => {
+      newSocket.disconnect();
+      console.log("WebSocket cleanup: Disconnected on component unmount");
+    };
+  }, []);
+
+  const handleDownload = async () => {
+    try {
+      const response = await fetch("https://d820-138-250-27-20.ngrok-free.app /download-zip");
+      if (!response.ok) {
+        throw new Error("Failed to download file");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "simulation.zip"; // Change filename if needed
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-        console.error('Error downloading the file:', error); 
-    } 
+      console.error("Error downloading the file:", error);
+    }
+  };
+
+  const handleClose = () => {
+    if (socket) {
+      socket.disconnect();
+      console.log("WebSocket explicitly disconnected on close button click");
+    }
+    onClose(); // Close the popup
   };
 
   return (
@@ -54,11 +85,15 @@ const handleDownload = async () => {
             <p key={index}>{msg}</p>
           ))}
         </div>
-        <div className="btn-grp">       
-          <button onClick={handleDownload} className="download-button"> Download Simulation Files </button>
+        <div className="btn-grp">
+          <button onClick={handleDownload} className="download-button">
+            Download Simulation Files
+          </button>
 
-          <button onClick={onClose} className="close-button">Close</button>
-        </div>  
+          <button onClick={handleClose} className="close-button">
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
