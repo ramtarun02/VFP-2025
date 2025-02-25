@@ -1,22 +1,24 @@
 from flask import Flask, request, jsonify, session, send_file
 from flask_cors import CORS
 from flask_session import Session
+from flask.sessions import SecureCookieSessionInterface
 from flask_socketio import SocketIO, emit
 import os
 import shutil
 import runVFP as run
 
-
-
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend requests
+CORS(app)
 
 # Secret key for signing session cookies (required for Flask sessions)
 app.config['SECRET_KEY'] = 'mysecret'
-app.config['SESSION_TYPE'] = 'filesystem'  # Stores session data in a file (better: use Redis)
+app.config['SESSION_TYPE'] = 'filesystem'
 
+# Initialize the session
 Session(app)
-socketio = SocketIO(app, manage_session=True, cors_allowed_origins="*")
+# Change to manage_session=False to manually handle sessions
+socketio = SocketIO(app, manage_session=False, cors_allowed_origins="*")
+
 
 @app.route('/start-vfp', methods=['POST'])
 def run_vfp():
@@ -37,6 +39,8 @@ def run_vfp():
     session["aoa"] = aoa
     session["reynolds"] = reynolds
     session['simName'] = simName
+    # Force the session to save
+    session.modified = True
 
     # Create a directory to store uploaded files if it doesn't exist
     UPLOAD_FOLDER = simName
@@ -65,57 +69,67 @@ def run_vfp():
             "Flow File Imported": datImported,
             "simName": simName,
         },
-        "uploaded_files": files_received  # Return saved file details
+        "uploaded_files": files_received,
+        "session_id": request.cookies.get('session')  # Return session ID for client to use
     }
     return jsonify(response)
 
-# # Endpoint to retrieve stored session values
-# @app.route('/get-vfp-data', methods=['GET'])
-# def get_vfp_data():
-#     return jsonify({
-#         "mach": session.get("mach"),
-#         "aoa": session.get("aoa"),
-#         "reynolds": session.get("reynolds")
-#     })
 
-# WebSocket endpoint for VFP Simulation
 @socketio.on('connect')
 def handle_connect():
     print("Client connected")
     emit('message', "WebSocket connection established")
 
+
 @socketio.on('start_simulation')
-def start_simulation():
-    sim_folder = session.get('simName')
-    print(sim_folder)
-    # run.copy_files_to_folder(session.get("simName"))
-    emit('message', "Simulation complete")
+def start_simulation(data=None):
+    if data and 'session_id' in data:
+        # Manually load the session with the provided session ID
+        session_interface = SecureCookieSessionInterface()
+        s = session_interface.get_signing_serializer(app)
+
+        try:
+            # Deserialize the session ID and get the session data
+            session_data = s.loads(data['session_id'])
+            # Use session data to retrieve specific variables
+            sim_folder = session_data.get('simName')
+            print(f"Retrieved simulation name from session: {sim_folder}")
+            emit('message', f"Simulation started for {sim_folder}")
+        except Exception as e:
+            print(f"Error loading session: {e}")
+            emit('error', "Could not load session data")
+    else:
+        print("No session ID provided")
+        emit('error', "Session ID not provided")
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
     print("Client disconnected")
 
+
 @app.route('/download-zip', methods=['GET'])
 def download_zip():
     sim_name = session.get("simName")
-    # 
-    # if not sim_name:
-    #     return jsonify({"error": "Simulation name not found in session"}), 400
+
+    if not sim_name:
+        return jsonify({"error": "Simulation name not found in session"}), 400
 
     zip_filename = f"{sim_name}.zip"
-    zip_path = os.path.join("./", zip_filename)  # Change to valid path
+    zip_path = os.path.join("./", zip_filename)
 
     # Ensure directory exists
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
     # Create ZIP file from the simulation directory
-    shutil.make_archive(zip_path.replace(".zip", ""), 'zip', f"./{sim_name}")  
+    shutil.make_archive(zip_path.replace(".zip", ""), 'zip', f"./{sim_name}")
 
     if not os.path.exists(zip_path):
         return jsonify({"error": "Failed to create ZIP file"}), 500
 
     return send_file(zip_path, as_attachment=True)
 
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=False, log_output=True, allow_unsafe_werkzeug=True)
 
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, use_reloader=False, log_output=True,
+                 allow_unsafe_werkzeug=True)
