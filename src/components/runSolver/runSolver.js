@@ -1,5 +1,7 @@
  // import logo f▏rom './logo.svg';
 import { useState, useEffect } from "react";
+import { useContext } from "react";
+import FormDataContext from "../FormDataContext";
 import { useNavigate } from "react-router-dom"; 
 import "./runSolver.css";
 import DragNDrop from "./DragNDrop";
@@ -16,7 +18,7 @@ function RunSolver() {
   const [geoImported, setGeoImported] = useState(false);
   const [datImported, setDatImported] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
-
+  const { setFormData } = useContext(FormDataContext);
   const navigate = useNavigate();
 
   const handleSubmit = async () => {
@@ -41,7 +43,11 @@ function RunSolver() {
       formData.append(`file_${index}`, file);
     });
 
-       const response = await fetch("https://d820-138-250-27-20.ngrok-free.app/start-vfp", {
+
+    setFormData(formData); // ✅ Save formData in context
+
+
+       const response = await fetch("http://localhost:5001/start-vfp", {
       method: "POST",
       body: formData, // No need for headers; browser sets `multipart/form-data
       mode: "cors"

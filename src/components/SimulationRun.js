@@ -1,70 +1,83 @@
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 import "./SimulationRun.css"
+import { useContext } from "react";
+import FormDataContext from "./FormDataContext";
 
 const SimulationRun = ({ onClose }) => {
   const [messages, setMessages] = useState([]);
   const [socket, setSocket] = useState(null); // Store socket in state
-
-  function getSessionId() {
-    const cookies = document.cookie.split(';');
-    for (let i=0; i<cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.startsWith('session=')) {
-        return cookie.substring('session='.length);
-      }
-    }
-    return null;
-  }
-
+  const { formData } = useContext(FormDataContext);
+ 
   useEffect(() => {
-    const newSocket = io("https://d820-138-250-27-20.ngrok-free.app ");
-    
+    if (!formData) {
+      console.error("Error: No form data available in SimulationRun component.");
+      return;
+    }
 
-    const sessionId = getSessionId();
+    const newSocket = io("http://localhost:5001", {
+      transports: ["websocket"], // Ensure WebSocket connection is used
+    });
 
     newSocket.on("connect", () => {
       console.log("WebSocket connected");
-      newSocket.emit("start_simulation", {
-        session_id: sessionId
-      }); // Trigger simulation on connect
 
+      // Convert FormData to a plain object
+      const formObject = Object.fromEntries(formData.entries());
 
+      newSocket.emit("start_simulation", formObject);
     });
 
     newSocket.on("message", (data) => {
-      setMessages((prev) => [...prev, data]);
+      console.log("Message from server:", data);
+      setMessages((prev) => [...prev, data]); // Store received messages
     });
 
     newSocket.on("disconnect", () => {
       console.log("WebSocket disconnected");
     });
 
-    setSocket(newSocket); // Save socket instance
+    setSocket(newSocket);
 
     return () => {
       newSocket.disconnect();
       console.log("WebSocket cleanup: Disconnected on component unmount");
     };
-  }, []);
+  }, [formData]);
+
 
   const handleDownload = async () => {
-    try {
-      const response = await fetch("https://d820-138-250-27-20.ngrok-free.app /download-zip");
+    
+
+    if (!formData) {
+      console.error("Error: No form data available in SimulationRun component.");
+      return;
+    }
+
+   // Convert FormData to a plain object
+      const formObject = Object.fromEntries(formData.entries());
+
+      try {
+        const response = await fetch("http://localhost:5001/download-zip", {
+        method: "POST",
+        body: formObject, // Send entire form data
+      });
+
+   
       if (!response.ok) {
         throw new Error("Failed to download file");
       }
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "simulation.zip"; // Change filename if needed
+      a.download = `${formObject.simName}.zip`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      a.remove();
     } catch (error) {
-      console.error("Error downloading the file:", error);
+      console.error("Download error:", error);
     }
   };
 

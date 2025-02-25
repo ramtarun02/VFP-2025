@@ -27,5 +27,11 @@ yarn-debug.log*
 yarn-error.log*
 
 /backend/__pycache__
+<<<<<<< HEAD
 
 /flask_sessions
+=======
+/backend/flask_session/
+>>>>>>> 161ec575dec49a0a957681d715f301f74d1135df
+
+/backend/Simulations

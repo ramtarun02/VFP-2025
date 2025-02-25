@@ -3,13 +3,8 @@ import shutil
 import tkinter as tk
 from tkinter import filedialog
 
-# # Function to browse and select a file
-# def browse_file(file_type):
-#     file_path = filedialog.askopenfilename(title=f"Select {file_type} file", filetypes=[("Text Files", "*.map;*.geo;*.dat")])
-#     if file_path:
-#         file_name, _ = os.path.splitext(os.path.basename(file_path))
-#         return file_name, file_path
-#     return None, None
+
+
 
 def create_batch_file(map_file, geo_file, flow_file, exc, cont, sim_folder):
     # Create the batch file contents
@@ -123,7 +118,7 @@ pause
 
 def copy_files_to_folder(destination_folder):
     """
-    Copies all files from a predefined source folder to the destination_folder.
+    Copies all files from VFP-Solver (vfp-solver) to the simulation_folder.
 
     :param destination_folder: The path to the folder where files will be copied.
     """
@@ -143,4 +138,4 @@ def copy_files_to_folder(destination_folder):
         if os.path.isfile(source_file):  # Only copy files, not directories
             shutil.copy2(source_file, destination_file)
 
-    print(f"All files copied from '{source_folder}' to '{destination_folder}'.")
+    return (f"All files copied from '{source_folder}' to '{destination_folder}'.")
