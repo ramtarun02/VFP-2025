@@ -1,7 +1,7 @@
 import os
 import shutil
-import tkinter as tk
-from tkinter import filedialog
+# import tkinter as tk
+# from tkinter import filedialog
 
 
 
@@ -78,19 +78,16 @@ copy fort.50 %_geo%%_flow%.fort50
 copy fort.51 %_geo%%_flow%.fort51
 copy fort.52 %_geo%%_flow%.fort52
 copy fort.55 %_geo%%_flow%.fort55
-pause
 echo.'start of wave drag calculation using field based method'
 :copy wavedrg.dat wavedrg72.dat
 copy fort.70 flow70.dat
 copy fort.71 flow71.dat
-pause
 f137b1.exe
 echo 'wave drag calculation complete'
 copy wavedrg73.dat %_geo%%_flow%wavedrg73.dat
 copy wavedrg74.dat %_geo%%_flow%wavedrg74.dat
 copy wavedrg75.dat %_geo%%_flow%wavedrg75.dat
 copy wavedrg76.dat %_geo%%_flow%wavedrg76.dat
-pause
 del fort.11
 del fort.15
 del fort.21
@@ -106,9 +103,8 @@ del wavedrg74.dat
 del wavedrg75.dat
 del wavedrg76.dat
 echo 'files moved and tidied'
-pause
-
-    """
+ 
+ """
     
     # Write to the batch file in the VFP folder
     batch_file_path = os.path.join(sim_folder, "run_vfp.bat")

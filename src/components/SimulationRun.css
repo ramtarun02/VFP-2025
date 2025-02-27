@@ -22,11 +22,19 @@
 .message-box {
   height: 250px;
   overflow-y: auto;
-  border: 1px solid #ccc;
+  background-color: #1e1e1e; /* Dark background */
+  color: #00ff00; /* Green text */
+  font-family: "Courier New", Courier, monospace; /* Monospace font */
+  border: 2px solid #00ff00; /* Green border */
   padding: 10px;
   margin-bottom: 15px;
+  white-space: pre-wrap; /* Preserve spacing */
+  font-size: 14px;
 }
 
+.message-box p {
+  margin: 2px 0; /* Minimize spacing */
+}
 
 .btn-grp {
   display: flex;

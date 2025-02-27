@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import "./SimulationRun.css"
 import { useContext } from "react";
@@ -15,7 +15,7 @@ const SimulationRun = ({ onClose }) => {
       return;
     }
 
-    const newSocket = io("https://a6f4-138-250-27-20.ngrok-free.app", {
+    const newSocket = io("https://99b4-138-250-27-4.ngrok-free.app", {
       transports: ["websocket"], // Ensure WebSocket connection is used
     });
 
@@ -46,40 +46,60 @@ const SimulationRun = ({ onClose }) => {
   }, [formData]);
 
 
-  const handleDownload = async () => {
-    
+const handleDownload = async () => {
+  if (!formData) {
+    console.error("Error: No form data available in SimulationRun component.");
+    return;
+  }
 
-    if (!formData) {
-      console.error("Error: No form data available in SimulationRun component.");
+  try {
+    // Extract simName from formData
+    const formObject = Object.fromEntries(formData.entries());
+    const simName = formObject.simName;
+
+    if (!simName) {
+      console.error("Error: Simulation name is missing in form data.");
       return;
     }
 
-   // Convert FormData to a plain object
-      const formObject = Object.fromEntries(formData.entries());
+    // Send request to initiate file download
+    const response = await fetch("https://99b4-138-250-27-4.ngrok-free.app/download-zip", {
+      method: "POST",
+      body: formData,
+      mode: "cors",
+      headers: {
+          "Accept": "application/zip",
+        },
+    });
 
-      try {
-        const response = await fetch("https://a6f4-138-250-27-20.ngrok-free.app/download-zip", {
-        method: "POST",
-        body: formObject, // Send entire form data
-      });
-
-   
-      if (!response.ok) {
-        throw new Error("Failed to download file");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${formObject.simName}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (error) {
-      console.error("Download error:", error);
+    if (!response.ok) {
+      throw new Error("Failed to download file");
     }
-  };
+
+    // Process response and trigger download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${simName}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download error:", error);
+  }
+};
+
+
+  const messageBoxRef = useRef(null);
+  useEffect(() => {
+    // Scroll to the bottom whenever the messages change
+    if (messageBoxRef.current) {
+      messageBoxRef.current.scrollTop = messageBoxRef.current.scrollHeight;
+    }
+  }, [messages]); // Trigger scroll when messages change
+
 
   const handleClose = () => {
     if (socket) {
@@ -93,7 +113,7 @@ const SimulationRun = ({ onClose }) => {
     <div className="popup-overlay">
       <div className="popup-container">
         <h2>VFP Simulation Running</h2>
-        <div className="message-box">
+        <div className="message-box" ref={messageBoxRef}>
           {messages.map((msg, index) => (
             <p key={index}>{msg}</p>
           ))}

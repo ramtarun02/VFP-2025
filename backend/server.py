@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import runVFP as run
+import zipfile
 
 app = Flask(__name__)
 CORS(app)
@@ -67,12 +68,42 @@ def run_vfp():
     }
     return jsonify(response)
 
+@app.route("/download-zip", methods=['POST'])
+def download_zip():
+    try:
+        # Ensure form data is present
+        if 'simName' not in request.form:
+            return jsonify({"error": "Missing simName in request."}), 400
+        sim_name = request.form['simName']
+        TEMP_ZIP_DIR = "./Simulations"
+        sim_folder_path = os.path.join("./Simulations", sim_name)
+        zip_file_path = os.path.join("./Simulations", f"{sim_name}.zip")
+        # Check if simulation folder exists
+        if not os.path.exists(sim_folder_path):
+            return jsonify({"error": "Simulation folder not found."}), 404
+        # Ensure temp directory exists
+        os.makedirs(TEMP_ZIP_DIR, exist_ok=True)
+        # Create a zip file using zipfile module
+        with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(sim_folder_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, sim_folder_path)
+                    zipf.write(file_path, arcname)
+        # Send the file to the client
+        return send_file(zip_file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # Cleanup temporary zip file after request completes
+        if os.path.exists(zip_file_path):
+            os.remove(zip_file_path)
+
 
 @socketio.on('connect')
 def handle_connect():
     print("Client connected")
     emit('message', "WebSocket connection established")
-
 
 @socketio.on('start_simulation')
 def start_simulation(data=None):
@@ -121,7 +152,7 @@ def start_simulation(data=None):
             print(f"Simulation started for: {sim_name}")
 
             script_dir = os.path.dirname(os.path.abspath(__file__))  # Get the current script's directory
-            bat_file_path = os.path.join(script_dir, sim_name, "run_vfp.bat")  # Adjust subdir name
+            bat_file_path = os.path.join(script_dir, sim_folder, "run_vfp.bat")  # Adjust subdir name
 
 
             emit('message', f"Simulation started for {sim_name}")
@@ -142,7 +173,7 @@ def start_simulation(data=None):
 
             try:
                 # Execute the batch file and capture output in real-time
-                process = subprocess.Popen(bat_file_path, shell= True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                process = subprocess.Popen(bat_file_path, shell= True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=os.path.dirname(bat_file_path))
 
                 # Read and print output in real-time
                 while True:
@@ -181,33 +212,7 @@ def handle_disconnect():
     print("Client disconnected")
 
 
-@app.route('/download-zip', methods=['POST'])
-def download_zip():
-    try:
-        # Extract form data from JSON request
-        data = request.get_json()
-        if not data or "simName" not in data:
-            return jsonify({"error": "Simulation name is missing in the request"}), 400
-
-        sim_name = data["simName"]
-        zip_filename = f"{sim_name}.zip"
-        zip_path = os.path.join("./", zip_filename)
-
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(zip_path), exist_ok=True)
-
-        # Create ZIP file from the simulation directory
-        shutil.make_archive(zip_path.replace(".zip", ""), 'zip', f"./{sim_name}")
-
-        if not os.path.exists(zip_path):
-            return jsonify({"error": "Failed to create ZIP file"}), 500
-
-        return send_file(zip_path, as_attachment=True)
-
-    except Exception as e:
-        print(f"Error creating ZIP file: {e}")
-        return jsonify({"error": "Internal server error"}), 500
-
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
+
