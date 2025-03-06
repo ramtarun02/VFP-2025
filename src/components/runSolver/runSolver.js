@@ -6,12 +6,16 @@ import { useNavigate } from "react-router-dom";
 import "./runSolver.css";
 import DragNDrop from "./DragNDrop";
 
+
+
 function RunSolver() {
   const [simName, setsimName] = useState(""); 
   const [mach, setMach] = useState("");
   const [aoa, setAoA] = useState("");
   const [reynolds, setReynolds] = useState("");
+  const [dumpName, setDumpName] = useState("");
   const [continuation, setContinuation] = useState(false);
+  const [dump, setDump] = useState(false);
   const [excrescence, setExcrescence] = useState(false);
   const [autoRunner, setAutoRunner] = useState(false);
   const [mapImported, setMapImported] = useState(false);
@@ -20,6 +24,7 @@ function RunSolver() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const { setFormData } = useContext(FormDataContext);
   const navigate = useNavigate();
+
 
   const handleSubmit = async () => {
 
@@ -31,6 +36,8 @@ function RunSolver() {
     formData.append("aoa", aoa);
     formData.append("reynolds", reynolds);
     formData.append("continuation", continuation);
+    formData.append("dump", dump);
+    formData.append("dumpName", dumpName)
     formData.append("excrescence", excrescence);
     formData.append("autoRunner", autoRunner);
     formData.append("mapImported", mapImported);
@@ -47,7 +54,7 @@ function RunSolver() {
     setFormData(formData); // ✅ Save formData in context
 
 
-       const response = await fetch("https://99b4-138-250-27-4.ngrok-free.app/start-vfp", {
+       const response = await fetch("http://localhost:5001/start-vfp", {
       method: "POST",
       body: formData, // No need for headers; browser sets `multipart/form-data
     });
@@ -113,6 +120,10 @@ return (
 
         <label>Reynolds Number</label>
         <input value={reynolds} onChange={(e) => setReynolds(e.target.value)} />
+      
+        <label>Dump File Name (Only For Continuation Runs)</label>
+        <input value={dumpName} onChange={(e) => setDumpName(e.target.value)} />
+
       </div>
 
       <div className="checkbox-group-2">
@@ -132,6 +143,13 @@ return (
         </label>
       </div>
 
+      {continuation && (
+        <label>
+          <input type="checkbox" className="dump-checkbox" onChange={() => {setDump(!dump)}}/>
+          Is this a continuation run at the same Mach and alpha 
+        </label>
+      )}
+
       <div className="button-group">
         <button className="run-button" onClick={handleSubmit}><span>Start VFP </span></button>
       </div>
@@ -140,6 +158,8 @@ return (
   </div>
 );
 }
+
+
 
 export default RunSolver;
 

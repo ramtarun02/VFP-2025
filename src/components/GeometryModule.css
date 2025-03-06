@@ -1,0 +1,226 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+/* Header styles */
+.header {
+  background-color: white;
+  padding: 1rem;
+  display: flex; justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+/* Button styles */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
+}
+
+.btn-secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn-secondary:hover {
+  background-color: #e5e7eb;
+}
+
+.btn-danger {
+  background-color: #dc2626;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
+/* Main content layout */
+.main-content {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+/* Graph section */
+.graph-container {
+  flex: 1;
+}
+
+.graph-panel {
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.graph-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tool-btn {
+  padding: 0.5rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.tool-btn:hover {
+  background-color: #f3f4f6;
+}
+
+.graph-canvas {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  width: 90%;
+  height: 300px;
+  background-color: white;
+}
+
+/* Controls panel */
+.controls-panel {
+  width: 320px;
+}
+
+.controls-container {
+  background-color: white;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.controls-title {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* Parameters table */
+.parameters-table {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-collapse: collapse;
+}
+
+.parameters-table th,
+.parameters-table td {
+  padding: 0.5rem;
+}
+
+.parameters-table th {
+  font-weight: 500;
+  text-align: left;
+}
+
+/* Input fields */
+.input-field {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Computation controls */
+.computation-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Improve section */
+.improve-section {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.improve-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.improve-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-group {
+  display: flex;
+  align-items: center;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.sections-input,
+.value-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.sections-input .input-field,
+.value-input .input-field {
+  width: 4rem;
+}
+
+.btn-improve {
+  width: 100%;
+  margin-top: 1rem;
+}

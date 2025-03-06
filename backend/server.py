@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import runVFP as run
 import zipfile
+import io
 
 app = Flask(__name__)
 CORS(app)
@@ -68,36 +69,36 @@ def run_vfp():
     }
     return jsonify(response)
 
-@app.route("/download-zip", methods=['POST'])
-def download_zip():
-    try:
-        # Ensure form data is present
-        if 'simName' not in request.form:
-            return jsonify({"error": "Missing simName in request."}), 400
-        sim_name = request.form['simName']
-        TEMP_ZIP_DIR = "./Simulations"
-        sim_folder_path = os.path.join("./Simulations", sim_name)
-        zip_file_path = os.path.join("./Simulations", f"{sim_name}.zip")
-        # Check if simulation folder exists
-        if not os.path.exists(sim_folder_path):
-            return jsonify({"error": "Simulation folder not found."}), 404
-        # Ensure temp directory exists
-        os.makedirs(TEMP_ZIP_DIR, exist_ok=True)
-        # Create a zip file using zipfile module
-        with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk(sim_folder_path):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, sim_folder_path)
-                    zipf.write(file_path, arcname)
-        # Send the file to the client
-        return send_file(zip_file_path, as_attachment=True)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        # Cleanup temporary zip file after request completes
-        if os.path.exists(zip_file_path):
-            os.remove(zip_file_path)
+# @app.route("/download-zip", methods=['POST'])
+# def download_zip():
+#     try:
+#         # Ensure form data is present
+#         if 'simName' not in request.form:
+#             return jsonify({"error": "Missing simName in request."}), 400
+#         sim_name = request.form['simName']
+#         TEMP_ZIP_DIR = "./Simulations"
+#         sim_folder_path = os.path.join("./Simulations", sim_name)
+#         zip_file_path = os.path.join("./Simulations", f"{sim_name}.zip")
+#         # Check if simulation folder exists
+#         if not os.path.exists(sim_folder_path):
+#             return jsonify({"error": "Simulation folder not found."}), 404
+#         # Ensure temp directory exists
+#         os.makedirs(TEMP_ZIP_DIR, exist_ok=True)
+#         # Create a zip file using zipfile module
+#         with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+#             for root, _, files in os.walk(sim_folder_path):
+#                 for file in files:
+#                     file_path = os.path.join(root, file)
+#                     arcname = os.path.relpath(file_path, sim_folder_path)
+#                     zipf.write(file_path, arcname)
+#         # Send the file to the client
+#         return send_file(zip_file_path, as_attachment=True)
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+#     finally:
+#         # Cleanup temporary zip file after request completes
+#         if os.path.exists(zip_file_path):
+#             os.remove(zip_file_path)
 
 
 @socketio.on('connect')
@@ -206,6 +207,38 @@ def start_simulation(data=None):
         print("No simulation data provided or 'simName' missing")
         emit('error', "Simulation data missing required fields")
 
+@socketio.on('download')
+def handle_download(data):
+    SIMULATIONS_DIR = "./Simulations"
+    try:
+        sim_name = data.get('simName')
+        if not sim_name:
+            emit('message', "Error: Simulation name missing.")
+            return
+
+        sim_folder = os.path.join(SIMULATIONS_DIR, sim_name)
+        if not os.path.exists(sim_folder):
+            emit('message', f"Error: Simulation folder '{sim_name}' not found.")
+            return
+
+        # Create an in-memory zip file
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for root, _, files in os.walk(sim_folder):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, sim_folder)
+                    zipf.write(file_path, arcname)
+
+        zip_buffer.seek(0)  # Reset buffer position
+
+        # Send the zip file as binary data
+        emit('download_ready', {'simName': sim_name, 'fileData': zip_buffer.getvalue()})
+
+    except Exception as e:
+        emit('message', f"Error during download: {str(e)}")
+
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -214,5 +247,5 @@ def handle_disconnect():
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
 

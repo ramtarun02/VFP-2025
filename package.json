@@ -2,6 +2,9 @@
   "name": "vfp-2025",
   "version": "0.1.0",
   "private": true,
+  "devServer": {
+    "allowedHosts": "all"
+  },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
@@ -9,11 +12,13 @@
     "@material-ui/icons": "^4.11.3",
     "@mui/icons-material": "^6.4.3",
     "@mui/material": "^6.4.3",
+    "@tailwindcss/vite": "^4.0.9",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "ajv": "^8.17.1",
     "d3": "^7.9.0",
+    "lucide-react": "^0.477.0",
     "material-ui-dropzone": "^3.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -21,6 +26,7 @@
     "react-router-dom": "^7.1.5",
     "react-scripts": "5.0.1",
     "socket.io-client": "^4.8.1",
+    "tailwindcss": "^4.0.9",
     "web-vitals": "^2.1.4"
   },
   "scripts": {

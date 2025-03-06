@@ -15,7 +15,7 @@ const SimulationRun = ({ onClose }) => {
       return;
     }
 
-    const newSocket = io("https://99b4-138-250-27-4.ngrok-free.app", {
+    const newSocket = io("http://localhost:5001", {
       transports: ["websocket"], // Ensure WebSocket connection is used
     });
 
@@ -33,6 +33,21 @@ const SimulationRun = ({ onClose }) => {
       setMessages((prev) => [...prev, data]); // Store received messages
     });
 
+    newSocket.on("download_ready", ({ fileData, simName }) => {
+      if (fileData) {
+      const blob = new Blob([fileData], { type: "application/zip" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${simName}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
+    });
+
+
     newSocket.on("disconnect", () => {
       console.log("WebSocket disconnected");
     });
@@ -46,50 +61,24 @@ const SimulationRun = ({ onClose }) => {
   }, [formData]);
 
 
-const handleDownload = async () => {
-  if (!formData) {
-    console.error("Error: No form data available in SimulationRun component.");
-    return;
-  }
+  const handleDownload = () => {
+    if (!formData) {
+      console.error("Error: No form data available in SimulationRun component.");
+      return;
+    }
 
-  try {
-    // Extract simName from formData
     const formObject = Object.fromEntries(formData.entries());
     const simName = formObject.simName;
-
     if (!simName) {
       console.error("Error: Simulation name is missing in form data.");
       return;
     }
 
-    // Send request to initiate file download
-    const response = await fetch("https://99b4-138-250-27-4.ngrok-free.app/download-zip", {
-      method: "POST",
-      body: formData,
-      mode: "cors",
-      headers: {
-          "Accept": "application/zip",
-        },
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to download file");
+    if (socket) {
+      socket.emit("download", { simName });
+      console.log("Download request sent via WebSocket");
     }
-
-    // Process response and trigger download
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${simName}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error("Download error:", error);
-  }
-};
+  };
 
 
   const messageBoxRef = useRef(null);
