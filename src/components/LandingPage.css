@@ -10,9 +10,8 @@
 }
 
 .title {
-  position: relative;
-  top: 25px;
-  left: 65px;
+  position: absolute;
+  align-content: center;
   font-family: 'Times New Roman', Times, serif;
   font-size: 50px;
   font-weight: bold;

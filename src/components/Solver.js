@@ -54,7 +54,7 @@ const Results = () => {
               {showPopup && <SimulationRun onClose={() => setShowPopup(false)} />}
             </div>
  
-            <a className="back-button" onClick={() => navigate("/run-solver")}>Go Back</a>
+            <button className="back-button" onClick={() => navigate("/run-solver")}>Go Back</button>
         </div>
     );
 };

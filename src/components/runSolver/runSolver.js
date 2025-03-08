@@ -54,7 +54,7 @@ function RunSolver() {
     setFormData(formData); // ✅ Save formData in context
 
 
-       const response = await fetch("http://localhost:5001/start-vfp", {
+       const response = await fetch("http://138.250.27.20:5001/start-vfp", {
       method: "POST",
       body: formData, // No need for headers; browser sets `multipart/form-data
     });

@@ -20,7 +20,7 @@
 }
 
 .message-box {
-  height: 250px;
+  height: 300px;
   overflow-y: auto;
   background-color: #1e1e1e; /* Dark background */
   color: #00ff00; /* Green text */
