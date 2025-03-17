@@ -135,7 +135,10 @@ def start_simulation(data=None):
                 elif filename.endswith(".dat"):
                     dat_file = os.path.splitext(filename)[0]  # Remove extension
             
-            print(map_file, geo_file, dat_file)
+
+            dump_file = data['dumpName']
+
+            print(map_file, geo_file, dat_file, dump_file)
 
             # If any file is missing, return an error
             if not map_file or not geo_file or not dat_file:
@@ -144,8 +147,9 @@ def start_simulation(data=None):
             # Extract boolean values and store as 'y' (true) or 'n' (false)
             con= 'y' if data.get("continuation", "false").lower() == "true" else 'n'
             exc = 'y' if data.get("excrescence", "false").lower() == "true" else 'n'
-            
-            print(exc, con)
+            dump = 'y' if data.get("dump", "false").lower() == "true" else 'n'
+
+            print(exc, con, dump)
 
             # Retrieve the simulation name directly from the received form data
             sim_name = data['simName']
@@ -161,7 +165,7 @@ def start_simulation(data=None):
             emit('message', run.copy_files_to_folder(sim_folder))
 
             try:
-                run.create_batch_file(map_file, geo_file, dat_file, exc, con, sim_folder)
+                run.create_batch_file(map_file, geo_file, dat_file, dump_file, exc, con, dump, sim_folder)
                 emit('message', "Batch File Created Successfully. Attempting to Run the VFP.exe")
 
             except Exception as e:

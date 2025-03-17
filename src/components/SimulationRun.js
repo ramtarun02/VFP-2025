@@ -15,7 +15,7 @@ const SimulationRun = ({ onClose }) => {
       return;
     }
 
-    const newSocket = io("http://138.250.27.20:5001", {
+    const newSocket = io("http://138.250.203.117:5001", {
       transports: ["websocket"], // Ensure WebSocket connection is used
     });
 

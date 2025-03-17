@@ -6,7 +6,7 @@ import shutil
 
 
 
-def create_batch_file(map_file, geo_file, flow_file, exc, cont, sim_folder):
+def create_batch_file(map_file, geo_file, flow_file, dump_file, exc, cont, dump, sim_folder):
     # Create the batch file contents
     batch_contents = f"""
 echo off
@@ -40,7 +40,7 @@ if not exist %_excresfile%.dat goto :excres
 copy %_excresfile%.dat excres.dat 
 :cont_run
 set _contrun={cont} 
-if %_contrun%==n (goto run_vfp) else (set /p _dumpfile=is this a continuation run at the same Mach and alpha type y for yes or n for no) 
+if %_contrun%==n (goto run_vfp) else (set _dumpfile={dump}) 
 if "%_dumpfile%"=="n" goto dump_filename
 copy %_geo%%_flow%.fort11 fort.11 
 copy %_geo%%_flow%.fort21 fort.21 
@@ -50,7 +50,7 @@ copy %_geo%%_flow%.fort52 fort.52
 copy %_geo%%_flow%.fort55 fort.55
 goto run_vfp
 :dump_filename
-set /p _dump=enter dump file name 
+set _dump={dump_file}
 if not exist %_dump%.fort52 (echo file was not found)  
 if not exist %_dump%.fort52 goto :dump_filename  
 copy %_dump%.fort11 fort.11 
