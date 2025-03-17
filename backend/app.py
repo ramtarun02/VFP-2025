@@ -163,7 +163,7 @@ def start_simulation(data=None):
             emit('message', run.copy_files_to_folder(sim_folder))
 
             try:
-                run.create_batch_file(map_file, geo_file, dat_file, exc, con, sim_folder)
+                run.create_batch_file(map_file, geo_file, dat_file, dump_file, exc, con, dump, sim_folder)
                 emit('message', "Batch File Created Successfully. Attempting to Run the VFP.exe")
 
             except Exception as e:

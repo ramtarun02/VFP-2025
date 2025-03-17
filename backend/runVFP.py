@@ -50,7 +50,7 @@ copy %_geo%%_flow%.fort52 fort.52
 copy %_geo%%_flow%.fort55 fort.55
 goto run_vfp
 :dump_filename
-set _dump={dump_file} 
+set _dump={dump_file}
 if not exist %_dump%.fort52 (echo file was not found)  
 if not exist %_dump%.fort52 goto :dump_filename  
 copy %_dump%.fort11 fort.11 
