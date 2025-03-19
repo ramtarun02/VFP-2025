@@ -1,16 +1,30 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 from flask_socketio import SocketIO, emit
 import os
 import shutil
 import subprocess
 import runVFP as run
+import readGEO as rG
 import zipfile
 import io
 
 app = Flask(__name__)
 CORS(app)
 
+# Configure upload folder and allowed extensions
+UPLOAD_FOLDER = 'uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# Ensure the upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+
+def allowed_file(filename):
+    """Check if the file has an allowed extension."""
+    ALLOWED_EXTENSIONS = {'GEO'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 # # Secret key for signing session cookies (required for Flask sessions)
 # app.config['SECRET_KEY'] = 'mysecret'
 # app.config['SESSION_TYPE'] = 'filesystem'
@@ -246,6 +260,44 @@ def handle_download(data):
 def handle_disconnect():
     print("Client disconnected")
 
+@app.route('/import-geo', methods=['POST'])
+def import_geo():
+    # Check if a file was uploaded
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+
+    # # Check if the file has a valid name and extension
+    # if file.filename == '':
+    #     return jsonify({'error': 'No selected file'}), 400
+    # if not allowed_file(file.filename):
+    #     return jsonify({'error': 'Invalid file type. Only .GEO files are allowed.'}), 400
+
+    # Save the file to the upload folder
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+
+    print(file_path)
+
+    try:
+        # Pass the file to the readGEO function
+        structured_array = rG.readGEO(file_path)
+        print(structured_array['YSECT'])
+        # Convert the structured array to JSON
+        json_data = rG.convert_to_json(structured_array)
+
+        # Return the JSON response
+        return json_data, 200
+
+    except Exception as e:
+        return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+
+    finally:
+        # Clean up: Delete the uploaded file after processing
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 
 if __name__ == '__main__':

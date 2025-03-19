@@ -1,4 +1,7 @@
 import numpy as np
+from flask import jsonify
+import airfoils as af
+
 
 def readGEO(filename):
     with open(filename, 'r') as f:
@@ -95,4 +98,50 @@ def readGEO(filename):
 
     return Sections
 
-# print(readGEO("CRM1wbs.GEO")[10]['US'])
+
+
+
+def convert_to_json(sections):
+
+    x = []
+    y = []
+    z = []
+    
+    points = af.airfoils(sections)
+
+    for section in points:
+
+        yn = section['YSECT']
+        XUS = section['xus']
+        ZUS = section['zus']
+        XLS = section['xls']
+        ZLS = section['zls']
+
+        for i in XUS:
+            x.append(i)
+            y.append(yn)
+
+        for j in ZUS:
+            z.append(j)
+
+
+        for k in XLS:
+            x.append(k)
+            y.append(yn)
+
+        for l in ZLS:
+            z.append(l)
+
+    # Create a dictionary to store the coordinates
+    coordinates_dict = {
+        "x": x,
+        "y": y,
+        "z": z
+    }
+    
+    # Convert the dictionary to a JSON object
+    return jsonify(coordinates_dict)
+
+
+
+# print(convert_to_json(readGEO("CRM1wbs.GEO")))
