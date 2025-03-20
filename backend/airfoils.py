@@ -29,7 +29,7 @@ def airfoils(Sections):
         x = s['G1SECT']
         inc = 0.00005
         i, p, t = 0, 0, 0
-        zus, xus, zls, xls = [], [], [], []
+        zus, xus, zls, xls, y = [], [], [], [], []
         
         while x <= s['G2SECT']:
             if i < len(s['US']) - 1 and x >= s['US'][i+1, 0]:
@@ -41,12 +41,13 @@ def airfoils(Sections):
             xus.append(x)
             zls.append(Lines['als'][p] * x + Lines['bls'][p])
             xls.append(x)
-            
+            y.append(s['YSECT'])           
             x += inc
             t += 1
         
-        zus, xus, zls, xls = np.array(zus), np.array(xus), np.array(zls), np.array(xls)
-        
+        zus, xus, zls, xls, y = np.array(zus), np.array(xus), np.array(zls), np.array(xls), np.array(y)
+
+
         # Thickness to chord ratio and camber line
         t_max = np.max(zus - zls)
         c = s['G2SECT'] - s['G1SECT']
@@ -58,7 +59,7 @@ def airfoils(Sections):
         x_diff = s['G2SECT'] - s['G1SECT']
         twist = np.degrees(np.arctan(z_diff / x_diff)) * (-1 if zus[0] < zus[-1] else 1)
         
-        Points.append({'xus': xus, 'zus': zus, 'xls': xls, 'zls': zls, 't_c': t_c, 'camber': camber, 'twist': twist})
+        Points.append({'y': y, 'xus': xus, 'zus': zus, 'xls': xls, 'zls': zls, 't_c': t_c, 'camber': camber, 'twist': twist})
     
     return Points
 

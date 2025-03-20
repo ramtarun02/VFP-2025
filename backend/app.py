@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import runVFP as run
 import readGEO as rG
+import airfoils as aF
 import zipfile
 import io
 
@@ -284,12 +285,12 @@ def import_geo():
     try:
         # Pass the file to the readGEO function
         structured_array = rG.readGEO(file_path)
-        print(structured_array['YSECT'])
+        points = aF.airfoils(structured_array)
         # Convert the structured array to JSON
-        json_data = rG.convert_to_json(structured_array)
+        plotly_format = rG.convert_to_plotly_format(points)
 
         # Return the JSON response
-        return json_data, 200
+        return jsonify({'plotData': plotly_format}), 200
 
     except Exception as e:
         return jsonify({'error': f'Error processing file: {str(e)}'}), 500

@@ -99,48 +99,49 @@ def readGEO(filename):
     return Sections
 
 
-
-
-def convert_to_json(sections):
-
-    x = []
-    y = []
-    z = []
+def convert_to_plotly_format(points):
+    """
+    Converts a list of dictionaries (each representing an airfoil section) into Plotly-friendly format.
     
-    points = af.airfoils(sections)
+    Parameters:
+        points (list): List of dictionaries, where each dictionary contains
+                       'y', 'xus', 'xls', 'zus', 'zls' keys.
 
-    for section in points:
-
-        yn = section['YSECT']
-        XUS = section['xus']
-        ZUS = section['zus']
-        XLS = section['xls']
-        ZLS = section['zls']
-
-        for i in XUS:
-            x.append(i)
-            y.append(yn)
-
-        for j in ZUS:
-            z.append(j)
-
-
-        for k in XLS:
-            x.append(k)
-            y.append(yn)
-
-        for l in ZLS:
-            z.append(l)
-
-    # Create a dictionary to store the coordinates
-    coordinates_dict = {
-        "x": x,
-        "y": y,
-        "z": z
-    }
+    Returns:
+        dict: A structured dictionary that can be directly used in Plotly.
+    """
+    plotly_data = []
     
-    # Convert the dictionary to a JSON object
-    return jsonify(coordinates_dict)
+    for i, section in enumerate(points):
+        # Create trace for the upper surface
+        upper_trace = {
+            'x': section['xus'].tolist(),
+            'y': section['y'].tolist(),  # Spanwise position
+            'z': section['zus'].tolist(),
+            'mode': 'lines',
+            'type': 'scatter3d',
+            'name': f'Section {i + 1} - Upper',
+            'line': {'color': 'blue',
+                     'width': 6}
+        }
+
+        # Create trace for the lower surface
+        lower_trace = {
+            'x': section['xls'].tolist(),
+            'y': section['y'].tolist(),  # Spanwise position
+            'z': section['zls'].tolist(),
+            'mode': 'lines',
+            'type': 'scatter3d',
+            'name': f'Section {i + 1} - Lower',
+            'line': {'color': 'red', 
+                     'width': 6}
+        }
+
+        plotly_data.append(upper_trace)
+        plotly_data.append(lower_trace)
+
+    return plotly_data
+
 
 
 

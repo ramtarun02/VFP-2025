@@ -1,13 +1,28 @@
 import React, { useState } from 'react';
-import Plot3D from './Plot3D'; // Import the 3D plotting component
-import "./GeometryModule.css";
+import Plot from 'react-plotly.js';
+import { ZoomIn, ZoomOut, Move, RotateCw } from 'lucide-react';
+import "./GeometryModule.css"
 
-function GeometryModule() {
+function App() {
   const [plotDataState, setPlotDataState] = useState(null);
-  const [sections, setSections] = useState([]); // Dropdown options
-  const [selectedSection, setSelectedSection] = useState(-1); // Default to "3D Wing"
+  const [plotLayout, setPlotLayout] = useState({
+  title: {
+    text: '3D Wing Section Visualization',
+    font: { size: 18 }
+  },
+  scene: {
+    aspectratio: { x: 3, y: 6, z: 1 }, // Stretch y-axis
+    xaxis: { title: 'Chordwise (X)', showgrid: true },
+    yaxis: { title: 'Spanwise (Y)', showgrid: true },
+    zaxis: { title: 'Thickness (Z)', showgrid: true },
+  },
+  paper_bgcolor: 'white',
+  plot_bgcolor: '#f8f8f8',
+  margin: { l: 40, r: 40, t: 50, b: 40 }, // Balanced margins
+});
+   
 
-  // Handle file upload and fetch data from backend
+  // handleFileUpload function to upload the file and fetch the data
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -21,23 +36,41 @@ function GeometryModule() {
         body: formData,
       });
 
-      const plotData = await response.json();
-      console.log("Received Plotly Data:", plotData);
+      // if (!response.ok) {
+      //   throw new Error('Network response was not ok');
+      // }
 
-      // Store plot data directly from response
-      if (plotData.plotData) {
-        setPlotDataState(plotData.plotData);
-        setSections(["3D Wing", ...Array.from({ length: plotData.plotData.length / 2 }, (_, i) => `Section ${i + 1}`)]);
-        setSelectedSection(-1); // Default to "3D Wing"
+      let data = await response.json();
+      console.log("Received data:", data); // Log the data
+
+      try {
+        // If data is a string, parse it into an object
+        if (typeof data === "string") {
+          data = JSON.parse(data);
+        }
+      } catch (error) {
+        console.error("Error parsing data:", error);
+        return;
       }
+
+      // Once data is fetched and parsed, set the plot data
+      handlePlotData(data); // Calling handlePlotData with the fetched data
     } catch (error) {
       console.error('Error uploading file:', error);
     }
-  };
+  }
 
-  // Handle section selection from dropdown
-  const handleSectionChange = (event) => {
-    setSelectedSection(parseInt(event.target.value));
+  // Function to update the plotDataState and trigger re-render
+  const handlePlotData = (data) => {
+    const newPlotData = [{
+      x: data.x,
+      y: data.y,
+      z: data.z,
+      type: 'scatter3d',
+      mode: 'lines+markers',
+      marker: { size: 2 }
+    }];
+    setPlotDataState(newPlotData);
   };
 
   return (
@@ -59,6 +92,7 @@ function GeometryModule() {
               Upload GEO File
             </button>
           </div>
+
         </div>
 
         <div className="header-group">
@@ -71,30 +105,22 @@ function GeometryModule() {
       <div className="main-content">
         <div className="graph-container">
           <div className="graph-panel">
-            {/* Single Dropdown for selecting sections */}
-            {sections.length > 0 && (
-              <div className="dropdown-container">
-                <label htmlFor="section-select">Section: </label>
-                <select id="section-select" onChange={handleSectionChange} value={selectedSection}>
-                  {sections.map((section, index) => (
-                    <option key={index - 1} value={index - 1}>
-                      {section}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Render Plot3D with selected section OR all sections */}
-            {plotDataState && (
-              <Plot3D 
-                plotData={selectedSection === -1 ? plotDataState : [plotDataState[selectedSection * 2], plotDataState[selectedSection * 2 + 1]]} 
-                selectedSection={selectedSection} 
-              />
-
-            )}
+            <div className="graph-canvas" id="plot">
+              {plotDataState ? (
+                <Plot data={plotDataState} layout={{...plotLayout,
+                autoSize: true,
+                width : '100%',
+                height: '100%',
+                }} 
+                useResizeHandler = {true}
+                style = {{width:'100%', height: '100%'}}/>
+              ) : (
+                <p>Loading plot...</p>
+              )}
+            </div>
           </div>
         </div>
+
 
         <div className="controls-panel">
           <div className="controls-container">
@@ -163,11 +189,9 @@ function GeometryModule() {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
 }
 
-export default GeometryModule;
-
+export default App;

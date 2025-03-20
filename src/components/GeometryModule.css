@@ -11,6 +11,11 @@ body {
   color: #111827;
 }
 
+body, button, input, select, table, h1, h2, h3, label {
+  font-family: 'Times New Roman', serif !important;
+}
+
+
 .app {
   min-height: 100vh;
 }
@@ -89,6 +94,7 @@ body {
 
 .graph-panel {
   background-color: white;
+  height: 702px;
   border-radius: 0.5rem;
   padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -224,3 +230,37 @@ body {
   width: 100%;
   margin-top: 1rem;
 }
+
+.dropdown-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Times New Roman', serif;
+}
+
+.dropdown-container label {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+#section-select {
+  font-family: 'Times New Roman', serif;
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+}
+
+#section-select:hover {
+  border-color: #007bff;
+}
+
+#section-select:focus {
+  outline: none;
+  border-color: #0056b3;
+  box-shadow: 0 0 5px rgba(0, 91, 187, 0.5);
+}
+
