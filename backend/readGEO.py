@@ -111,6 +111,8 @@ def convert_to_plotly_format(points):
         dict: A structured dictionary that can be directly used in Plotly.
     """
     plotly_data = []
+    twist_values = []
+    section_numbers = []
     
     for i, section in enumerate(points):
         # Create trace for the upper surface
@@ -137,8 +139,36 @@ def convert_to_plotly_format(points):
                      'width': 6}
         }
 
+        camber_trace = {
+                'x': section['xus'].tolist(),
+                'y': section['y'].tolist(),
+                'z': section['camber'].tolist(),
+                'mode': 'lines',
+                'type': 'scatter3d',
+                'name': f'Section {i + 1} - Camber',
+                'line': {'color': 'green', 'width': 3}
+                }
+
+        # Append twist values and section numbers for separate plotting
+        twist_values.append(section['twist'])
+        section_numbers.append(i + 1)
+
         plotly_data.append(upper_trace)
         plotly_data.append(lower_trace)
+        plotly_data.append(camber_trace)
+
+
+    # Create twist distribution trace
+    twist_trace = {
+        'x': section_numbers,
+        'y': twist_values,
+        'mode': 'lines+markers',
+        'type': 'scatter',
+        'name': 'Twist Distribution',
+        'line': {'color': 'black', 'width': 4}
+    }
+
+    plotly_data.append(twist_trace)
 
     return plotly_data
 

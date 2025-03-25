@@ -7,6 +7,7 @@ function GeometryModule() {
   const [sections, setSections] = useState([]); // Dropdown options
   const [selectedSection, setSelectedSection] = useState(-1); // Default to "3D Wing"
 
+
   // Handle file upload and fetch data from backend
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
@@ -16,7 +17,7 @@ function GeometryModule() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/import-geo', {
+      const response = await fetch('http://127.0.1:5000/import-geo', {
         method: 'POST',
         body: formData,
       });
@@ -27,7 +28,7 @@ function GeometryModule() {
       // Store plot data directly from response
       if (plotData.plotData) {
         setPlotDataState(plotData.plotData);
-        setSections(["3D Wing", ...Array.from({ length: plotData.plotData.length / 2 }, (_, i) => `Section ${i + 1}`)]);
+        setSections(["3D Wing", ...Array.from({ length: (plotData.plotData.length-1) / 3 }, (_, i) => `Section ${i + 1}`), "Twist Distribution"]);
         setSelectedSection(-1); // Default to "3D Wing"
       }
     } catch (error) {
@@ -35,10 +36,17 @@ function GeometryModule() {
     }
   };
 
-  // Handle section selection from dropdown
   const handleSectionChange = (event) => {
-    setSelectedSection(parseInt(event.target.value));
-  };
+    const sectionIndex = parseInt(event.target.value);
+    if (sections[sectionIndex + 2] === "Twist Distribution") {
+      console.log("selected Option", selectedSection)
+      setSelectedSection(-2);
+      console.log("Value Updated", selectedSection, plotDataState[plotDataState.length -1])
+      
+    } else {
+      setSelectedSection(sectionIndex);
+        }
+    };
 
   return (
     <div className="app">
@@ -75,20 +83,22 @@ function GeometryModule() {
             {sections.length > 0 && (
               <div className="dropdown-container">
                 <label htmlFor="section-select">Section: </label>
-                <select id="section-select" onChange={handleSectionChange} value={selectedSection}>
-                  {sections.map((section, index) => (
-                    <option key={index - 1} value={index - 1}>
-                      {section}
-                    </option>
-                  ))}
-                </select>
+                  <select id="section-select" onChange={handleSectionChange} 
+                    value={selectedSection === -2 ? sections.length - 1 : selectedSection}>
+                      {sections.map((section, index) => (
+                      <option key={index} value={index - 1}>
+                        {section}
+                      </option>
+                    ))}
+                  </select>
+                  
               </div>
             )}
 
             {/* Render Plot3D with selected section OR all sections */}
             {plotDataState && (
               <Plot3D 
-                plotData={selectedSection === -1 ? plotDataState : [plotDataState[selectedSection * 2], plotDataState[selectedSection * 2 + 1]]} 
+                plotData = {(selectedSection === -1) ? plotDataState.slice(0,-1) : [plotDataState[selectedSection * 3], plotDataState[selectedSection * 3 + 1], plotDataState[selectedSection*3 +2]]}
                 selectedSection={selectedSection} 
               />
 
