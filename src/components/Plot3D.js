@@ -11,7 +11,8 @@ const Plot3D = ({ plotData, selectedSection}) => {
         camera: { eye: { x: 1.5, y: 1.5, z: 1.5 } }
       }
     : { // 2D Section View (Only X-Z view)
-        aspectmode: 'data',
+        aspectmode: 'manual',
+        aspectratio: {x: 2, y: 8, z: 2},
         xaxis: { title: { text: 'Chordwise (X)', font: { family: 'Times New Roman' } }, showgrid: true },
         yaxis: { visible: false },
         zaxis: { title: { text: 'Thickness (Z)', font: { family: 'Times New Roman' } }, showgrid: true },
@@ -23,10 +24,11 @@ const Plot3D = ({ plotData, selectedSection}) => {
       text: 'Wing Geometry Visualisation',
       font: { size: 18, family: 'Times New Roman' },
     },
+    autorange: true,
     scene: sceneLayout,
     showlegend: selectedSection !== -1,
     autosize: true, 
-    margin: { l: 10, r: 10, t: 30, b: 10 },
+    margin: { l: 25, r: 10, t: 50, b: 25 },
     font: { family: 'Times New Roman' },
   };
 
@@ -37,7 +39,7 @@ const Plot3D = ({ plotData, selectedSection}) => {
         layout={layout}
         useResizeHandler={true}
         config={{responsive: true}}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '90%' }}
       />
     </>
   );

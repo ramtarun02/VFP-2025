@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import Plot3D from './Plot3D'; // Import the 3D plotting component
 import "./GeometryModule.css";
 
+
 function GeometryModule() {
+  const [geoData, setGeoData] = useState(null);
   const [plotDataState, setPlotDataState] = useState(null);
   const [sections, setSections] = useState([]); // Dropdown options
   const [selectedSection, setSelectedSection] = useState(-1); // Default to "3D Wing"
-
+  const [parameters, setParameters] = useState({});
+  const [modifiedParameters, setModifiedParameters] = useState({});
 
   // Handle file upload and fetch data from backend
   const handleFileUpload = async (event) => {
@@ -22,31 +25,94 @@ function GeometryModule() {
         body: formData,
       });
 
-      const plotData = await response.json();
-      console.log("Received Plotly Data:", plotData);
+      const { geoData, plotData } = await response.json();
+      console.log("Received Data:", { geoData, plotData });
 
-      // Store plot data directly from response
-      if (plotData.plotData) {
-        setPlotDataState(plotData.plotData);
-        setSections(["3D Wing", ...Array.from({ length: (plotData.plotData.length-1) / 3 }, (_, i) => `Section ${i + 1}`), "Twist Distribution"]);
-        setSelectedSection(-1); // Default to "3D Wing"
+      if (plotData) {
+        setGeoData(geoData);
+        setPlotDataState(plotData);
+        setSections(["3D Wing", ...geoData.map((_, i) => `Section ${i + 1}`), "Twist Distribution"]);
+        setSelectedSection(-1);
       }
-    } catch (error) {
+   } catch (error) {
       console.error('Error uploading file:', error);
     }
   };
 
+
+
   const handleSectionChange = (event) => {
     const sectionIndex = parseInt(event.target.value);
-    if (sections[sectionIndex + 2] === "Twist Distribution") {
-      console.log("selected Option", selectedSection)
+    if (sections[sectionIndex + 1] === "Twist Distribution") {
       setSelectedSection(-2);
-      console.log("Value Updated", selectedSection, plotDataState[plotDataState.length -1])
-      
     } else {
       setSelectedSection(sectionIndex);
-        }
-    };
+      updateParameters(sectionIndex);
+
+    }
+  };
+
+  const updateParameters = (sectionIndex) => {
+    if (sectionIndex === -1) {
+      setParameters({
+        Twist: '',
+        Dihedral:'',
+        YSECT: '',
+        XLE: '',
+        XTE: '',
+        Chord: '',
+      });
+    }
+ 
+    if (geoData && geoData[sectionIndex]) {
+      setParameters({
+        Twist: geoData[sectionIndex].TWIST,
+        Dihedral: geoData[sectionIndex].HSECT,
+        YSECT: geoData[sectionIndex].YSECT,
+        XLE: geoData[sectionIndex].G1SECT,
+        XTE: geoData[sectionIndex].G2SECT,
+        Chord: (geoData[sectionIndex].G2SECT - geoData[sectionIndex].G1SECT),
+      });
+    }
+  };
+
+  const handleParameterChange = (param, value) => {
+    setModifiedParameters(prev => ({ ...prev, [param]: value }));
+  };
+
+
+
+
+
+
+
+    const plot_trace = (sectionIndex) => {
+    if (!plotDataState) return [];
+    
+    if (sectionIndex === -1) { // "3D Wing" selected
+      return plotDataState.flatMap((sectionData, index) => (
+        [
+          { x: sectionData.xus, y: sectionData.y,  z: sectionData.zus, type: 'scatter3d', mode: 'lines', name: `Upper Trace - Section ${index + 1}`, line: {'color': 'red', 'width': 6}},
+          { x: sectionData.xls, y: sectionData.y,  z: sectionData.zls, type: 'scatter3d', mode: 'lines', name: `Lower Trace - Section ${index + 1}`, line: {'color': 'blue', 'width': 6} }
+        ]
+      ));
+    }
+    
+    if (sectionIndex === -2) { // "Twist Distribution" selected
+      return [
+        { x: plotDataState.map((_, i) => i + 1), y: plotDataState.map(section => section.twist), type: 'scatter', mode: 'lines+markers', name: 'Twist Distribution' }
+      ];
+    }  
+
+
+    const sectionData = plotDataState[sectionIndex] || {};
+    
+
+    return [
+      { x: sectionData.xus, y: sectionData.zus, type: 'scatter', mode: 'lines', name: `Upper Surface - Section ${sectionIndex + 1}` , line: {'color': 'blue', 'width': 3} },
+      { x: sectionData.xls, y: sectionData.zls, type: 'scatter', mode: 'lines', name: `Lower Surface - Section ${sectionIndex + 1}` , line: {'color': 'blue', 'width': 3} }
+    ];
+  };
 
   return (
     <div className="app">
@@ -72,7 +138,7 @@ function GeometryModule() {
         <div className="header-group">
           <button className="btn btn-secondary">Export GEO file</button>
           <button className="btn btn-secondary">Save plots</button>
-          <button className="btn btn-danger">Reset</button>
+          <button className="btn btn-danger" onClick={ () => window.location.reload(false)}>Reset</button>
         </div>
       </header>
 
@@ -84,9 +150,9 @@ function GeometryModule() {
               <div className="dropdown-container">
                 <label htmlFor="section-select">Section: </label>
                   <select id="section-select" onChange={handleSectionChange} 
-                    value={selectedSection === -2 ? sections.length - 1 : selectedSection}>
+                    value={selectedSection === -2 ? sections.length   : selectedSection}>
                       {sections.map((section, index) => (
-                      <option key={index} value={index - 1}>
+                      <option key={index} value={index-1}>
                         {section}
                       </option>
                     ))}
@@ -98,8 +164,7 @@ function GeometryModule() {
             {/* Render Plot3D with selected section OR all sections */}
             {plotDataState && (
               <Plot3D 
-                plotData = {(selectedSection === -1) ? plotDataState.slice(0,-1) : [plotDataState[selectedSection * 3], plotDataState[selectedSection * 3 + 1], plotDataState[selectedSection*3 +2]]}
-                selectedSection={selectedSection} 
+                plotData =  {plot_trace(selectedSection)} selectedSection={selectedSection} 
               />
 
             )}
@@ -109,7 +174,7 @@ function GeometryModule() {
         <div className="controls-panel">
           <div className="controls-container">
             <h2 className="controls-title">Controls</h2>
-            
+
             <table className="parameters-table">
               <thead>
                 <tr>
@@ -119,11 +184,11 @@ function GeometryModule() {
                 </tr>
               </thead>
               <tbody>
-                {['Twist', 'Dihedral', 'YSECT', 'XLE', 'XTE', 'Chord'].map((param) => (
-                  <tr key={param}>
-                    <td>{param}</td>
-                    <td><input type="text" className="input-field" /></td>
-                    <td><input type="text" className="input-field" /></td>
+                {Object.entries(parameters  || { Twist: 0.0, Dihedral: 0.0, YSECT: 0.0, XLE: 0.0, XTE: 0.0, Chord: 0.0 }).map(([key, value]) => (
+                  <tr key={key}>
+                    <td>{key}</td>
+                    <td><input type="text" className="input-field" value= {value} readOnly /></td>
+                    <td><input type="text" className="input-field" onChange={(e) => handleParameterChange(key, e.target.value)}/></td>
                   </tr>
                 ))}
               </tbody>

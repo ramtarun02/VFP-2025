@@ -284,13 +284,13 @@ def import_geo():
 
     try:
         # Pass the file to the readGEO function
-        structured_array = rG.readGEO(file_path)
-        points = aF.airfoils(structured_array)
+        geo_data = rG.readGEO(file_path)
+        points = aF.airfoils(geo_data)
         # Convert the structured array to JSON
-        plotly_format = rG.convert_to_plotly_format(points)
+        # plotly_format = rG.convert_to_plotly_format(points)
 
         # Return the JSON response
-        return jsonify({'plotData': plotly_format}), 200
+        return jsonify({'geoData': geo_data, 'plotData': points}), 200
 
     except Exception as e:
         return jsonify({'error': f'Error processing file: {str(e)}'}), 500
