@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Plot3D from './Plot3D'; // Import the 3D plotting component
 import "./GeometryModule.css";
+import { useNavigate } from "react-router-dom";
 
 
 function GeometryModule() {
@@ -10,6 +11,7 @@ function GeometryModule() {
   const [selectedSection, setSelectedSection] = useState(-1); // Default to "3D Wing"
   const [parameters, setParameters] = useState({});
   const [modifiedParameters, setModifiedParameters] = useState({});
+  const navigate = useNavigate();
 
   // Handle file upload and fetch data from backend
   const handleFileUpload = async (event) => {
@@ -118,7 +120,7 @@ function GeometryModule() {
     <div className="app">
       <header className="header">
         <div className="header-group">
-          <button className="btn btn-primary">Back to Main Module</button>
+          <button className="btn btn-primary" onClick={() => navigate('/')}>Back to Main Module</button>
           <button className="btn btn-secondary">FPCON</button>
 
           <div className='btn btn-secondary'>
