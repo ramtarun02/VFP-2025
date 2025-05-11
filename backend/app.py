@@ -10,6 +10,7 @@ import readGEO as rG
 import airfoils as aF
 import zipfile
 import io
+import math
 
 app = Flask(__name__)
 CORS(app)
@@ -299,6 +300,77 @@ def import_geo():
         # Clean up: Delete the uploaded file after processing
         if os.path.exists(file_path):
             os.remove(file_path)
+
+
+
+
+def compute_KS0D(CL0, CD0, A):
+    return 1 - math.sqrt(((2 * CL0) / (math.pi * A)) ** 2 + (1 - (2 * CD0) / (math.pi * A)) ** 2)
+
+def compute_TS0D(CL0, CD0, A):
+    return (math.atan((2 * CL0 / (math.pi * A)) / (1 - (2 * CD0 / (math.pi * A)))) * 180) / math.pi
+
+@app.route("/prowim-compute", methods=["POST"])
+def compute():
+    data = request.get_json()  # ← This is crucial
+    if data is None:
+        return jsonify({"error": "Invalid or missing JSON"}), 400
+
+
+    A = float(data["A"])
+    bOverD = float(data["bOverD"])
+    cOverD = float(data["cOverD"])
+    alpha0 = float(data["alpha0"])
+    N = float(data["N"])
+    NSPSW = float(data["NSPSW"])
+    ZPD = float(data["ZPD"])
+    IW = float(data["IW"])
+    CT = float(data["CTIP"])
+    CL0 = float(data["CL0"][0])
+    CD0 = float(data["CD0"][0])
+    KS00 = float(data["KS00"][0])
+    ALFAWI = float(data["ALFAWI"][0])
+    NELMNT = float(data["NELMNT"])
+
+    KS0D = compute_KS0D(CL0, CD0, A)
+    TS0D = compute_TS0D(CL0, CD0, A)
+    Hzp = 1 - 2.5 * abs(ZPD)
+    Kdc = -1.630 * cOverD ** 2 + 2.3727 * cOverD + 0.0038
+    Izp = (455.93 * ZPD ** 6 - 10.67 * ZPD**5 - 87.221 * ZPD**4 -
+           3.2742 * ZPD**3 + 0.2309 * ZPD**2 + 0.0418 * ZPD + 1.0027)
+
+    TS0Ap0_1d = -2 * Kdc * alpha0
+    TS10 = Hzp * TS0Ap0_1d + 1.15 * Kdc * Izp * IW + (ALFAWI - IW)
+    theta_s = TS0D + (CT + 0.3 * math.sin(math.pi * CT ** 1.36)) * (TS10 - TS0D)
+    ks = KS0D + CT * (KS00 - KS0D)
+    r = math.sqrt(1 - CT)
+
+    theta_rad = math.radians(theta_s)
+    TS0D_rad = math.radians(TS0D)
+    alpha_p = ALFAWI - IW
+
+    CZ = ((1 + r) * (1 - ks) * math.sin(theta_rad) +
+          ((2 / N) * bOverD ** 2 - (1 + r)) * r ** 2 *
+          (1 - KS00) * math.sin(TS0D_rad))
+
+    CZwf = CZ - CT * math.sin(math.radians(alpha_p))
+    CZDwf = CZwf * NSPSW / (1 - CT)
+
+    CX = ((1 + r) * ((1 - ks) * math.cos(theta_rad) - r) +
+          ((2 / N) * bOverD ** 2 - (1 + r)) * r ** 2 *
+          ((1 - KS00) * math.cos(TS0D_rad) - 1))
+
+    CXwf = CX - CT * math.cos(math.radians(alpha_p))
+    CXDwf = CXwf * NSPSW / (1 - CT)
+
+    return jsonify({
+        "CZ": CZ,
+        "CZwf": CZwf,
+        "CZDwf": CZDwf,
+        "CX": CX,
+        "CXwf": CXwf,
+        "CXDwf": CXDwf
+    })
 
 
 if __name__ == '__main__':
