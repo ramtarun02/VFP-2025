@@ -1,6 +1,5 @@
 // Prowim3Dmodel.js
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
@@ -16,7 +15,7 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   // NACA 0012 airfoil coordinates
-  const airfoilCoords = [
+  const airfoilCoords = useMemo(() => [
     [0.0000000, 0.0000000],
     [0.0005839, 0.0042603],
     [0.0023342, 0.0084289],
@@ -149,7 +148,7 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
     [0.0023342, -0.0084289],
     [0.0005839, -0.0042603],
     [0.0000000, 0.0000000],
-  ];
+  ], []);
 
   // Update dimensions on mount and resize with padding
   useEffect(() => {
@@ -177,13 +176,11 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
     };
   }, []);
 
-  useEffect(() => {
-    if (dimensions.width <= 0 || dimensions.height <= 0) return;
 
-    // Cleanup previous scene if it exists
-    if (rendererRef.current && mountRef.current && mountRef.current.contains(rendererRef.current.domElement)) {
-      mountRef.current.removeChild(rendererRef.current.domElement);
-    }
+
+  useEffect(() => {
+    const mountNode = mountRef.current;
+    if (!mountNode || dimensions.width <= 0 || dimensions.height <= 0) return;
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -192,7 +189,7 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
 
     const camera = new THREE.PerspectiveCamera(60, dimensions.width / dimensions.height, 0.1, 1000);
     camera.position.set(10, 10, 10);
-    camera.lookAt(0,0,0);
+    camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ 
@@ -201,7 +198,7 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
     });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(dimensions.width, dimensions.height);
-    mountRef.current.appendChild(renderer.domElement);
+    mountNode.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     // Add OrbitControls
@@ -218,23 +215,15 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 5, 5);
     scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
 
-    const ambientLight = new THREE.AmbientLight(0x404040);
-    scene.add(ambientLight);
-
-    // Add axes helper
-    
-    const axesHelper = new THREE.AxesHelper(1);
-    scene.add(axesHelper);
     // Enhanced Axes Helper with Labels
-    const axesSize = D *  1.5; // Scale axes based on propeller diameter
-    const axesLineWidth = 3; // Thicker lines
-
-    // Create colored lines for each axis
+    const axesSize = D * 1.5;
+    const axesLineWidth = 3;
     const axes = [
-      { color: 0xff0000, direction: new THREE.Vector3(1, 0, 0) }, // X - Red
-      { color: 0x00ff00, direction: new THREE.Vector3(0, 1, 0) }, // Y - Green
-      { color: 0x0000ff, direction: new THREE.Vector3(0, 0, 1) }  // Z - Blue
+      { color: 0xff0000, direction: new THREE.Vector3(1, 0, 0) },
+      { color: 0x00ff00, direction: new THREE.Vector3(0, 1, 0) },
+      { color: 0x0000ff, direction: new THREE.Vector3(0, 0, 1) }
     ];
 
     const axesGroup = new THREE.Group();
@@ -243,133 +232,109 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3().copy(axis.direction).multiplyScalar(axesSize)
       ]);
-      
-      const lineMaterial = new THREE.LineBasicMaterial({
-        color: axis.color,
-        linewidth: axesLineWidth
-      });
-      
-      const line = new THREE.Line(lineGeometry, lineMaterial);
+      const line = new THREE.Line(
+        lineGeometry,
+        new THREE.LineBasicMaterial({ color: axis.color, linewidth: axesLineWidth })
+      );
       axesGroup.add(line);
-    });
 
-    // Add arrowheads
-    const arrowheadSize = axesSize * 0.1;
-    axes.forEach((axis) => {
+      const arrowheadSize = axesSize * 0.1;
       const arrowhead = new THREE.Mesh(
         new THREE.ConeGeometry(arrowheadSize * 0.2, arrowheadSize, 16),
         new THREE.MeshBasicMaterial({ color: axis.color })
       );
       arrowhead.position.copy(axis.direction).multiplyScalar(axesSize);
       arrowhead.lookAt(new THREE.Vector3(0, 0, 0));
-      arrowhead.rotateX(-Math.PI/2); // Correct cone orientation
+      arrowhead.rotateX(-Math.PI/2);
       axesGroup.add(arrowhead);
     });
 
-    // Add labels
     const labelDistance = axesSize * 1.1;
     const createLabel = (text, color, position) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const context = canvas.getContext('2d');
-    context.font = 'Bold 40px Arial';
-    context.fillStyle = `rgba(${color.r * 255}, ${color.g * 255}, ${color.b * 255}, 1)`;
-    context.textAlign = 'center';
-    context.fillText(text, 32, 32);
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const context = canvas.getContext('2d');
+      context.font = 'Bold 40px Arial';
+      context.fillStyle = `rgba(${color.r * 255}, ${color.g * 255}, ${color.b * 255}, 1)`;
+      context.textAlign = 'center';
+      context.fillText(text, 32, 32);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(0.5, 0.5, 0.5);
-    sprite.position.copy(position);
-    axesGroup.add(sprite);
-  };
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) })
+      );
+      sprite.scale.set(0.5, 0.5, 0.5);
+      sprite.position.copy(position);
+      axesGroup.add(sprite);
+    };
 
     createLabel('X', new THREE.Color(1, 0, 0), new THREE.Vector3(labelDistance, 0, 0));
     createLabel('Y', new THREE.Color(0, 1, 0), new THREE.Vector3(0, labelDistance, 0));
     createLabel('Z', new THREE.Color(0, 0, 1), new THREE.Vector3(0, 0, labelDistance));
-
     scene.add(axesGroup);
 
-    // Convert airfoil to shape with chord length scaling
-    const shape = new THREE.Shape();
-
-    // Calculate scaling factor (original airfoil has chord length of 1.0)
+    // Wing geometry
     const chord = D * cOverD;
-    const scaleFactor = chord; // Since original coordinates go from 0 to 1
-
-    // Create scaled airfoil shape
+    const span = D * bOverD / 2;
+    const shape = new THREE.Shape();
     airfoilCoords.forEach(([x, y], i) => {
-      const scaledX = x * scaleFactor;
-      const scaledY = y * scaleFactor;
-      if (i === 0) {
-        shape.moveTo(scaledX, scaledY);
-      } else {
-        shape.lineTo(scaledX, scaledY);
-      }
+      const scaledX = x * chord;
+      const scaledY = y * chord;
+      i === 0 ? shape.moveTo(scaledX, scaledY) : shape.lineTo(scaledX, scaledY);
     });
 
-    // Wing geometry
-    const span = D * bOverD / 2;
-    const extrudeSettings = { 
+    const wingGeometry = new THREE.ExtrudeGeometry(shape, { 
       depth: span, 
       bevelEnabled: false 
-    };
-
-    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    geometry.rotateY(Math.PI / 2);  // Rotate to align with X-axis
-    geometry.center();  // Center the geometry at origin
-
-    const material = new THREE.MeshStandardMaterial({ 
-      color: 0x0077ff,
-      side: THREE.DoubleSide,
-      metalness: 0.3,
-      roughness: 0.7
     });
+    wingGeometry.rotateY(Math.PI / 2);
+    wingGeometry.center();
 
-    const wingMesh = new THREE.Mesh(geometry, material);
+    const wingMesh = new THREE.Mesh(
+      wingGeometry,
+      new THREE.MeshStandardMaterial({ 
+        color: 0x0077ff,
+        side: THREE.DoubleSide,
+        metalness: 0.3,
+        roughness: 0.7
+      })
+    );
     wingMeshRef.current = wingMesh;
     scene.add(wingMesh);
 
     // Propeller geometry
-    const propRadius = (D / 2);
+    const propRadius = D / 2;
     const propThickness = 0.05;
-    const propGeometry = new THREE.CylinderGeometry(propRadius, propRadius, propThickness, 64);
-    const propMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0xff0000,
-      transparent: true,
-      opacity: 0.8
-    });
-
-    const propellerMesh = new THREE.Mesh(propGeometry, propMaterial);
+    const propellerMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(propRadius, propRadius, propThickness, 64),
+      new THREE.MeshStandardMaterial({ 
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.8
+      })
+    );
     
-    // Position propeller in front of wing (positive Z direction)
-    // Wing leading edge is at -chord/2 after translation
-    const xPos = span * (propLocation - 0.5); // Along Span
-    const yPos = 0; // Along the vertical axis
-    const zPos = chord/2 + 0.5; // Small offset in front of wing
-    
-    propellerMesh.position.set(xPos, yPos, zPos);
-    propellerMesh.rotation.set(0, 0, 0);
-    propellerMesh.rotateX(Math.PI/2); // Orient propeller disk to face forward
-    
+    propellerMesh.position.set(
+      span * (propLocation - 0.5),
+      0,
+      chord/2 + 0.5
+    );
+    propellerMesh.rotateX(Math.PI/2);
     propellerMeshRef.current = propellerMesh;
     scene.add(propellerMesh);
-
 
     // Animation loop
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
-      controls.update(); // only required if controls.enableDamping = true
+      controls.update();
       renderer.render(scene, camera);
     };
     animate();
 
-    // Handle window resize
     const handleResize = () => {
-      const width = mountRef.current.clientWidth;
-      const height = mountRef.current.clientHeight;
+      if (!mountNode) return;
+      const width = mountNode.clientWidth;
+      const height = mountNode.clientHeight;
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height);
@@ -381,22 +346,56 @@ const Prowim3Dmodel = ({ bOverD, cOverD, D, propLocation }) => {
       cancelAnimationFrame(animationIdRef.current);
       window.removeEventListener('resize', handleResize);
 
-      if (mountRef.current && mountRef.current.contains(renderer.domElement)) {
-        mountRef.current.removeChild(renderer.domElement);
+      if (mountNode?.contains(renderer.domElement)) {
+        mountNode.removeChild(renderer.domElement);
       }
       
-      if (controlsRef.current) {
-        controlsRef.current.dispose();
-      }
-      
-      geometry.dispose();
-      propGeometry.dispose();
-      material.dispose();
-      propMaterial.dispose();
+      controls.dispose();
+      renderer.dispose();
+      wingGeometry.dispose();
+      propellerMesh.geometry.dispose();
+      wingMesh.material.dispose();
+      propellerMesh.material.dispose();
     };
-  }, [bOverD, D, propLocation]);
+  }, [bOverD, cOverD, D, propLocation, dimensions, airfoilCoords]);
 
-  return <div ref={mountRef} style={{ width: '100%', height: '500px', overflow: 'hidden', boxSizing: 'border-box' }} />;
+  return (
+    <div 
+      ref={mountRef} 
+      style={{ 
+        width: '100%', 
+        height: '500px', 
+        overflow: 'hidden', 
+        boxSizing: 'border-box' 
+      }} 
+    />
+  );
 };
 
 export default Prowim3Dmodel;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
