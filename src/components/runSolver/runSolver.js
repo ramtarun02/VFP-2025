@@ -54,7 +54,7 @@ function RunSolver() {
     setFormData(formData); // ✅ Save formData in context
 
 
-       const response = await fetch("https://8lbcwkpj-5001.uks1.devtunnels.ms/start-vfp", {
+       const response = await fetch("http://127.0.1:5000/start-vfp", {
       method: "POST",
       body: formData, // No need for headers; browser sets `multipart/form-data
     });

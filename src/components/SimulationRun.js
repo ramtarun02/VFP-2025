@@ -15,7 +15,7 @@ const SimulationRun = ({ onClose }) => {
       return;
     }
 
-    const newSocket = io("https://8lbcwkpj-5001.uks1.devtunnels.ms", {
+    const newSocket = io("http://127.0.1:5000", {
       transports: ["websocket"], // Ensure WebSocket connection is used
     });
 
