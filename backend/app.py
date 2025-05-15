@@ -355,6 +355,7 @@ def compute():
 
     CZwf = CZ - CT * math.sin(math.radians(alpha_p))
     CZDwf = CZwf * NSPSW / (1 - CT)
+    CZD = CZ * NSPSW / (1 - CT)
 
     CX = ((1 + r) * ((1 - ks) * math.cos(theta_rad) - r) +
           ((2 / N) * bOverD ** 2 - (1 + r)) * r ** 2 *
@@ -362,14 +363,17 @@ def compute():
 
     CXwf = CX - CT * math.cos(math.radians(alpha_p))
     CXDwf = CXwf * NSPSW / (1 - CT)
+    CXD = CX * NSPSW / (1 - CT)
 
     return jsonify({
         "CZ": CZ,
         "CZwf": CZwf,
         "CZDwf": CZDwf,
+        "CZD": CZD,
         "CX": CX,
         "CXwf": CXwf,
-        "CXDwf": CXDwf
+        "CXDwf": CXDwf, 
+        "CXD": CXD
     })
 
 

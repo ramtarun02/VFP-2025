@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import "./ProWiM.css";
 import Prowim3Dmodel from "./Prowim3Dmodel";
+import { useNavigate } from "react-router-dom";
 
 
 function PropellerWingForm() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     A: "",
     bOverD: "6",
@@ -115,61 +118,63 @@ function PropellerWingForm() {
             <option value="1">Single Flap</option>
             <option value="2">Double Flaps</option>
           </select>
-
+          
           <button type="submit">Compute</button>
+
+          <button className="btn btn-primary" onClick={() => navigate('/')}>Back to Main Module</button>
         </form>
 
         {result && (
           <div className="results">
             <div>
-              <label>CZ</label>
+              <label>CL_Prop</label>
               <input 
                 type="text" 
-                value={result.CZ.toFixed(5)} 
+                value={result.CZD.toFixed(5)} 
                 readOnly 
               />
             </div>
             <div>
-              <label>CZwf</label>
+              <label>&Delta; CD_Prop</label>
               <input 
                 type="text" 
-                value={result.CZwf.toFixed(5)} 
+                value={result.CXD.toFixed(5)} 
                 readOnly 
               />
             </div>
-            <div>
-              <label>CZDwf</label>
-              <input 
-                type="text" 
-                value={result.CZDwf.toFixed(5)} 
-                readOnly 
-              />
-            </div>
-            <div>
-              <label>CX</label>
-              <input 
-                type="text" 
-                value={result.CX.toFixed(5)} 
-                readOnly 
-              />
-            </div>
-            <div>
-              <label>CXwf</label>
-              <input 
-                type="text" 
-                value={result.CXwf.toFixed(5)} 
-                readOnly 
-              />
-            </div>
-            <div>
-              <label>CXDwf</label>
-              <input 
-                type="text" 
-                value={result.CXDwf.toFixed(5)} 
-                readOnly 
-              />
-            </div>
- 
+ {/*            <div> */}
+ {/*              <label>CZDwf</label> */}
+ {/*              <input  */}
+ {/*                type="text"  */}
+ {/*                value={result.CZDwf.toFixed(5)}  */}
+ {/*                readOnly  */}
+ {/*              /> */}
+ {/*            </div> */}
+ {/*            <div> */}
+ {/*              <label>CX</label> */}
+ {/*              <input  */}
+ {/*                type="text"  */}
+ {/*                value={result.CX.toFixed(5)}  */}
+ {/*                readOnly  */}
+ {/*              /> */}
+ {/*            </div> */}
+ {/*            <div> */}
+ {/*              <label>CXwf</label> */}
+ {/*              <input  */}
+ {/*                type="text"  */}
+ {/*                value={result.CXwf.toFixed(5)}  */}
+ {/*                readOnly  */}
+ {/*              /> */}
+ {/*            </div> */}
+ {/*            <div> */}
+ {/*              <label>CXDwf</label> */}
+ {/*              <input  */}
+ {/*                type="text"  */}
+ {/*                value={result.CXDwf.toFixed(5)}  */}
+ {/*                readOnly  */}
+ {/*              /> */}
+ {/*            </div> */}
+ {/*  */}
 
 
 
