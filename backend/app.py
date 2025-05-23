@@ -7,10 +7,10 @@ import shutil
 import subprocess
 import runVFP as run
 import readGEO as rG
-import airfoils as aF
 import zipfile
 import io
-import math
+import math 
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
@@ -262,6 +262,9 @@ def handle_download(data):
 def handle_disconnect():
     print("Client disconnected")
 
+
+
+
 @app.route('/import-geo', methods=['POST'])
 def import_geo():
     # Check if a file was uploaded
@@ -286,7 +289,7 @@ def import_geo():
     try:
         # Pass the file to the readGEO function
         geo_data = rG.readGEO(file_path)
-        points = aF.airfoils(geo_data)
+        points = rG.airfoils(geo_data)
         # Convert the structured array to JSON
         # plotly_format = rG.convert_to_plotly_format(points)
 
@@ -376,6 +379,69 @@ def compute():
         "CXD": CXD
     })
 
+
+@app.route('/compute_desired', methods=['POST'])
+def compute_desired():
+    data = request.get_json()
+    section_index = data['sectionIndex']
+    parameters = data['parameters']
+    geo_data = data['geoData']
+
+    print(section_index)
+
+    print(parameters)
+
+
+    # Extract the target airfoil coordinates
+    airfoil_US = np.array(geo_data[section_index]['US'])  # Assuming format is [[x1,y1], [x2,y2], ...]
+    airfoil_LS = np.array(geo_data[section_index]['LS']) 
+    # --- Apply transformations ---
+    # 1. Scale chord length (if 'Chord' is in parameters)
+    if 'Chord' in parameters:
+        scale_factor = float(parameters['Chord'])
+        print("Scale Factor is ", scale_factor)
+        airfoil_US *= scale_factor
+        airfoil_LS *= scale_factor
+
+    # 2. Move leading edge to (0, 0) (optional, but useful for rotations)
+    x_le, y_le = airfoil_US[0]  # Assuming first point is the leading edge
+    # airfoil_coords -= [x_le, y_le]
+
+    # 3. Apply twist (if 'Twist' is in parameters)
+    if 'Twist' in parameters:
+        twist_deg = float(parameters['Twist'])  # e.g., 0.07 degrees
+        theta = np.radians(twist_deg)
+        rotation_matrix = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta), np.cos(theta)]
+        ])
+        airfoil_US = np.dot(airfoil_US, rotation_matrix)  # Rotate around (0, 0)
+        airfoil_LS = np.dot(airfoil_LS, rotation_matrix)  # Rotate around (0, 0)
+   
+    geo_data[section_index]['US'] = airfoil_US.tolist()
+    geo_data[section_index]['LS'] = airfoil_LS.tolist()
+
+    # # Move back to original LE position (if needed)
+    # airfoil_coords += [x_le, y_le]
+
+    # 4. Modify Dihedral in geo_data
+    if 'Dihedral' in parameters:
+        geo_data[section_index]['HSECT'] = parameters['Dihedral']
+
+    # 5. Update YSECT
+    if 'YSECT' in parameters:
+        geo_data[section_index]['YSECT'] = parameters['YSECT']
+
+    plotData = rG.airfoils(geo_data)
+
+    # # Update the geo_data with modified coordinates
+    # geo_data[section_index]['coordinates'] = airfoil_coords.tolist()
+
+    # Return updated data
+    return jsonify({
+        'updatedGeoData': geo_data,
+        'updatedPlotData': plotData  # Replace with actual plot data if needed
+    })
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)

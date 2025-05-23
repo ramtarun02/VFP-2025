@@ -3,12 +3,15 @@ import numpy as np
 import math 
 
 def airfoils(Sections):
-    for s in Sections:
-        # Check if the first coordinates of US and LS are [0, 0]
-        if s['US'][0] == (0, 0) and s['LS'][0] == (0, 0):
+ 
+    # Check if all sections have US and LS starting with (0, 0)
+    if all(s['US'][0][0] == 0 and s['LS'][0][0] == 0 for s in Sections):
+        # If condition is met, perform the transformation for all sections
+        for s in Sections:
             s['US'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['US']]
             s['LS'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['LS']]
-    
+
+
     Points = []
     
     for s in Sections:

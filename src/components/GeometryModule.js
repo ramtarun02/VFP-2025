@@ -81,16 +81,59 @@ function GeometryModule() {
   const handleParameterChange = (param, value) => {
     setModifiedParameters(prev => ({ ...prev, [param]: value }));
   };
+ 
 
+  // Add these functions to your GeometryModule component
 
+  const computeDesired = async () => {
+    if (selectedSection === null || selectedSection === undefined) {
+      alert("Please select a section first");
+      return;
+    }
 
+    // Check if at least one parameter is modified
+    if (Object.keys(modifiedParameters).length === 0) {
+      alert("Please modify at least one parameter before computing");
+      return;
+    }
 
+    try {
+      const response = await fetch('http://127.0.1:5000/compute_desired', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sectionIndex: selectedSection,
+          parameters: modifiedParameters,
+          geoData: geoData
+        }),
+      });
 
+      const { updatedGeoData, updatedPlotData } = await response.json();
 
+      console.log(updatedPlotData)
+      console.log(updatedGeoData)
+      if (updatedPlotData) {
+        // Update the state with new data
+        setGeoData(updatedGeoData);
+        setPlotDataState(updatedPlotData);
+        // Reset modified parameters
+        setModifiedParameters({});
+        // Update the parameters display
+        updateParameters(selectedSection);
+        }
+    } catch (error) {
+    console.error('Error computing desired parameters:', error);
+    }
+  };
 
-    const plot_trace = (sectionIndex) => {
-    if (!plotDataState) return [];
-    
+  const plot_trace = (sectionIndex) => {
+    if (!plotDataState) {
+      console.log('No Data Found')
+      return [];
+    }
+
     if (sectionIndex === -1) { // "3D Wing" selected
       return plotDataState.flatMap((sectionData, index) => (
         [
@@ -100,6 +143,7 @@ function GeometryModule() {
       ));
     }
     
+   
     if (sectionIndex === -2) { // "Twist Distribution" selected
       return [
         { x: plotDataState.map((_, i) => i + 1), y: plotDataState.map(section => section.twist), type: 'scatter', mode: 'lines+markers', name: 'Twist Distribution' }
@@ -111,7 +155,7 @@ function GeometryModule() {
     
 
     return [
-      { x: sectionData.xus, y: sectionData.zus, type: 'scatter', mode: 'lines', name: `Upper Surface - Section ${sectionIndex + 1}` , line: {'color': 'blue', 'width': 3} },
+      { x: sectionData.xus, y: sectionData.zus, type: 'scatter', mode: 'lines', name: `Upper Surface - Section ${sectionIndex + 1}` , line: {'color': 'red', 'width': 3} },
       { x: sectionData.xls, y: sectionData.zls, type: 'scatter', mode: 'lines', name: `Lower Surface - Section ${sectionIndex + 1}` , line: {'color': 'blue', 'width': 3} }
     ];
   };
@@ -190,14 +234,14 @@ function GeometryModule() {
                   <tr key={key}>
                     <td>{key}</td>
                     <td><input type="text" className="input-field" value= {value} readOnly /></td>
-                    <td><input type="text" className="input-field" onChange={(e) => handleParameterChange(key, e.target.value)}/></td>
+                    <td><input type="text" className="input-field" onChange={(e) => handleParameterChange(key, e.target.value)} value={modifiedParameters[key] ?? ''}/></td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             <div className="computation-controls">
-              <button className="btn btn-primary">Compute Desired</button>
+              <button className="btn btn-primary" onClick={computeDesired}>Compute Desired</button>
               <button className="btn btn-primary">Compute Global (b)</button>
             </div>
 
