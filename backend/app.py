@@ -386,61 +386,76 @@ def compute_desired():
     section_index = data['sectionIndex']
     parameters = data['parameters']
     geo_data = data['geoData']
-
-    print(section_index)
+    plot_data = data['plotData']
 
     print(parameters)
+    sec = section_index
+    i = sec  # converting to 0-based index
+    print(i)
+    # Extract parameters
+    dtwist = float(parameters['Twist'])
+    ntwist = (dtwist - plot_data[sec]['twist']) * (np.pi / 180)
+    
+    dHSECT = float(parameters['Dihedral'])
+    nHSECT = dHSECT - geo_data[sec]['HSECT']
+    
+    dchord = float(parameters['Chord'])
+    scale = dchord / (geo_data[i]['G2SECT'] - geo_data[i]['G1SECT'])
+    
+    dXLE = float(parameters['XLE'])
+    
+    # Extract X and Z coordinates (assuming US is a list of [x,z] pairs)
+    xus_orig = [point[0] for point in geo_data[i]['US']]  # List of X-coordinates
+    zus_orig = [point[1] for point in geo_data[i]['US']]  # List of Z-coordinates
+    
+    nXLE = dXLE - xus_orig[0] - ((xus_orig[0] * (scale - 1)))
+    nZLE = zus_orig[0] * (scale - 1)
+    
+    dysect = float(parameters['YSECT'])
+    
+    # Update values based on changes
+    if round(ntwist, 5) != 0:
+        geo_data[i]['NTWIST'] = plot_data[i]['twist'] + ntwist / (np.pi / 180)
+    
+    if round(nHSECT, 5) != 0:
+        geo_data[i]['NHSECT'] = dHSECT
+    
+    if round(dysect - geo_data[i]['YSECT'], 4) != 0:
+        geo_data[i]['NYSECT'] = dysect
+    
+    # Calculate new coordinates (Upper Surface)
+    xus_n = []
+    zus_n = []
+    for n in range(len(xus_orig)):
+        x = ((geo_data[i]['G1SECT'] + ((-geo_data[i]['G1SECT'] + xus_orig[n]) * np.cos(ntwist)) + 
+             ((zus_orig[n] - geo_data[i]['HSECT']) * np.sin(ntwist))) * scale) + nXLE
+        z = ((geo_data[i]['HSECT'] - ((-geo_data[i]['G1SECT'] + xus_orig[n]) * np.sin(ntwist)) + 
+             ((zus_orig[n] - geo_data[i]['HSECT']) * np.cos(ntwist))) * scale) - nZLE
+        xus_n.append(x)
+        zus_n.append(z)
+    
+    # Calculate new coordinates (Lower Surface)
+    xls_orig = [point[0] for point in geo_data[i]['LS']]  # List of X-coordinates
+    zls_orig = [point[1] for point in geo_data[i]['LS']]  # List of Z-coordinates
+    xls_n = []
+    zls_n = []
+    for n in range(len(xls_orig)):
+        x = ((geo_data[i]['G1SECT'] + ((-geo_data[i]['G1SECT'] + xls_orig[n]) * np.cos(ntwist)) + 
+             ((zls_orig[n] - geo_data[i]['HSECT']) * np.sin(ntwist))) * scale) + nXLE
+        z = ((geo_data[i]['HSECT'] - ((-geo_data[i]['G1SECT'] + xls_orig[n]) * np.sin(ntwist)) + 
+             ((zls_orig[n] - geo_data[i]['HSECT']) * np.cos(ntwist))) * scale) - nZLE
+        xls_n.append(x)
+        zls_n.append(z)
+    
+    # Update the geometry data with new coordinates (as lists of [x,z] pairs)
+    geo_data[i]['US_N'] = [[x, z] for x, z in zip(xus_n, zus_n)]
+    geo_data[i]['LS_N'] = [[x, z] for x, z in zip(xls_n, zls_n)]
 
+    plot_data2 = rG.airfoils(geo_data)
 
-    # Extract the target airfoil coordinates
-    airfoil_US = np.array(geo_data[section_index]['US'])  # Assuming format is [[x1,y1], [x2,y2], ...]
-    airfoil_LS = np.array(geo_data[section_index]['LS']) 
-    # --- Apply transformations ---
-    # 1. Scale chord length (if 'Chord' is in parameters)
-    if 'Chord' in parameters:
-        scale_factor = float(parameters['Chord'])
-        print("Scale Factor is ", scale_factor)
-        airfoil_US *= scale_factor
-        airfoil_LS *= scale_factor
-
-    # 2. Move leading edge to (0, 0) (optional, but useful for rotations)
-    x_le, y_le = airfoil_US[0]  # Assuming first point is the leading edge
-    # airfoil_coords -= [x_le, y_le]
-
-    # 3. Apply twist (if 'Twist' is in parameters)
-    if 'Twist' in parameters:
-        twist_deg = float(parameters['Twist'])  # e.g., 0.07 degrees
-        theta = np.radians(twist_deg)
-        rotation_matrix = np.array([
-            [np.cos(theta), -np.sin(theta)],
-            [np.sin(theta), np.cos(theta)]
-        ])
-        airfoil_US = np.dot(airfoil_US, rotation_matrix)  # Rotate around (0, 0)
-        airfoil_LS = np.dot(airfoil_LS, rotation_matrix)  # Rotate around (0, 0)
-   
-    geo_data[section_index]['US'] = airfoil_US.tolist()
-    geo_data[section_index]['LS'] = airfoil_LS.tolist()
-
-    # # Move back to original LE position (if needed)
-    # airfoil_coords += [x_le, y_le]
-
-    # 4. Modify Dihedral in geo_data
-    if 'Dihedral' in parameters:
-        geo_data[section_index]['HSECT'] = parameters['Dihedral']
-
-    # 5. Update YSECT
-    if 'YSECT' in parameters:
-        geo_data[section_index]['YSECT'] = parameters['YSECT']
-
-    plotData = rG.airfoils(geo_data)
-
-    # # Update the geo_data with modified coordinates
-    # geo_data[section_index]['coordinates'] = airfoil_coords.tolist()
-
-    # Return updated data
     return jsonify({
         'updatedGeoData': geo_data,
-        'updatedPlotData': plotData  # Replace with actual plot data if needed
+        'updatedPlotData': plot_data2
     })
 
 if __name__ == '__main__':

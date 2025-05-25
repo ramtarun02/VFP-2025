@@ -45,11 +45,19 @@ def readGEO(filename):
             LS.append((float(line[0]), float(line[1])))
             index += 1
 
+        US_N = []
+        LS_N = []
+        NTWIST = 0
+        NHSECT = 0
+        NYSECT = 0
+
+
         Sections.append({
             'YSECT': YSECT, 'G1SECT': G1SECT, 'G2SECT': G2SECT, 'HSECT': HSECT,
             'IMARK': IMARK, 'MU': MU, 'ML': ML,
             'XTWSEC': XTWSEC, 'TWIST': TWIST,
-            'US': US, 'LS': LS
+            'US': US, 'LS': LS, 'US_N': US_N, 'LS_N': LS_N, 
+            'NTWIST': NTWIST, 'NHSECT': NHSECT, 'NYSECT': NYSECT
         })
 
     # Read NRAD and associated radii values
@@ -66,8 +74,6 @@ def readGEO(filename):
         index += 1
 
     return Sections
-
-
 
 def interpolate_airfoil(airfoil_points, num_points=10000):
     """
@@ -105,8 +111,6 @@ def interpolate_airfoil(airfoil_points, num_points=10000):
     
     return interpolated_points, x_new, y_new
 
-
-
 def airfoils(Sections):
  
     # Check if all sections have US and LS starting with (0, 0)
@@ -116,16 +120,14 @@ def airfoils(Sections):
             s['US'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['US']]
             s['LS'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['LS']]
 
-
     Points = []
-    
 
     try:
         for s in Sections:
-            smoothed_airfoil, x_new, z_new = interpolate_airfoil(s['US'], num_points=10000)
+            _, x_new, z_new = interpolate_airfoil(s['US'], num_points=10000)
             xus = x_new
             zus = z_new
-            smoothed_airfoil, x_new, z_new = interpolate_airfoil(s['LS'], num_points=10000)
+            _, x_new, z_new = interpolate_airfoil(s['LS'], num_points=10000)
             xls = x_new
             zls = z_new
 
@@ -143,10 +145,20 @@ def airfoils(Sections):
             x_diff = s['G2SECT'] - s['G1SECT']
             twist = (math.degrees(math.atan(z_diff / x_diff))) * (-1 if zus[0] < zus[-1] else 1)
             
+        
+            xus_n = []
+            zus_n = []
+            xls_n = []
+            zls_n = []
+        
+
+
             Points.append({
                 'y': y, 'xus': xus, 'zus': zus, 'xls': xls, 'zls': zls,
-                't_c': t_c, 'camber': camber, 'twist': twist
+                't_c': t_c, 'camber': camber, 'twist': twist, 'xus_n': xus_n, 'zus_n': zus_n, 
+                'xls_n': xls_n, 'zls_n': zls_n
             })
+
 
         return Points
  

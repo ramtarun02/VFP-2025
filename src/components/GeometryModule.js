@@ -6,7 +6,9 @@ import { useNavigate } from "react-router-dom";
 
 function GeometryModule() {
   const [geoData, setGeoData] = useState(null);
-  const [plotDataState, setPlotDataState] = useState(null);
+  const [newgeoData, setnewGeoData] = useState(null);
+  const [plotData, setPlotData] = useState(null);
+  const [newplotData, setnewPlotData] = useState(null);
   const [sections, setSections] = useState([]); // Dropdown options
   const [selectedSection, setSelectedSection] = useState(-1); // Default to "3D Wing"
   const [parameters, setParameters] = useState({});
@@ -32,7 +34,7 @@ function GeometryModule() {
 
       if (plotData) {
         setGeoData(geoData);
-        setPlotDataState(plotData);
+        setPlotData(plotData);
         setSections(["3D Wing", ...geoData.map((_, i) => `Section ${i + 1}`), "Twist Distribution"]);
         setSelectedSection(-1);
       }
@@ -79,9 +81,12 @@ function GeometryModule() {
   };
 
   const handleParameterChange = (param, value) => {
-    setModifiedParameters(prev => ({ ...prev, [param]: value }));
+    setModifiedParameters(prev => ({
+      ...parameters,       // Start with the original Parameters
+      ...prev,            // Apply any previously modified values
+      [param]: value      // Override with the newly changed parameter
+    }));
   };
- 
 
   // Add these functions to your GeometryModule component
 
@@ -106,7 +111,8 @@ function GeometryModule() {
         body: JSON.stringify({
           sectionIndex: selectedSection,
           parameters: modifiedParameters,
-          geoData: geoData
+          geoData: geoData,
+          plotData: plotData
         }),
       });
 
@@ -116,8 +122,8 @@ function GeometryModule() {
       console.log(updatedGeoData)
       if (updatedPlotData) {
         // Update the state with new data
-        setGeoData(updatedGeoData);
-        setPlotDataState(updatedPlotData);
+        setnewGeoData(updatedGeoData);
+        setnewPlotData(updatedPlotData);
         // Reset modified parameters
         setModifiedParameters({});
         // Update the parameters display
@@ -129,36 +135,101 @@ function GeometryModule() {
   };
 
   const plot_trace = (sectionIndex) => {
-    if (!plotDataState) {
-      console.log('No Data Found')
-      return [];
-    }
+  if (!plotData) {
+    console.log('No Data Found')
+    return [];
+  }
 
-    if (sectionIndex === -1) { // "3D Wing" selected
-      return plotDataState.flatMap((sectionData, index) => (
-        [
-          { x: sectionData.xus, y: sectionData.y,  z: sectionData.zus, type: 'scatter3d', mode: 'lines', name: `Upper Trace - Section ${index + 1}`, line: {'color': 'red', 'width': 6}},
-          { x: sectionData.xls, y: sectionData.y,  z: sectionData.zls, type: 'scatter3d', mode: 'lines', name: `Lower Trace - Section ${index + 1}`, line: {'color': 'blue', 'width': 6} }
-        ]
-      ));
-    }
-    
-   
-    if (sectionIndex === -2) { // "Twist Distribution" selected
-      return [
-        { x: plotDataState.map((_, i) => i + 1), y: plotDataState.map(section => section.twist), type: 'scatter', mode: 'lines+markers', name: 'Twist Distribution' }
-      ];
-    }  
-
-
-    const sectionData = plotDataState[sectionIndex] || {};
-    
-
+  if (sectionIndex === -1) { // "3D Wing" selected
+    return plotData.flatMap((sectionData, index) => (
+      [
+        { 
+          x: sectionData.xus, 
+          y: sectionData.y,  
+          z: sectionData.zus, 
+          type: 'scatter3d', 
+          mode: 'lines', 
+          name: `Upper Trace - Section ${index + 1}`, 
+          line: {'color': 'red', 'width': 6}
+        },
+        { 
+          x: sectionData.xls, 
+          y: sectionData.y,  
+          z: sectionData.zls, 
+          type: 'scatter3d', 
+          mode: 'lines', 
+          name: `Lower Trace - Section ${index + 1}`, 
+          line: {'color': 'blue', 'width': 6} 
+        }
+      ]
+    ));
+  }
+  
+  if (sectionIndex === -2) { // "Twist Distribution" selected
     return [
-      { x: sectionData.xus, y: sectionData.zus, type: 'scatter', mode: 'lines', name: `Upper Surface - Section ${sectionIndex + 1}` , line: {'color': 'red', 'width': 3} },
-      { x: sectionData.xls, y: sectionData.zls, type: 'scatter', mode: 'lines', name: `Lower Surface - Section ${sectionIndex + 1}` , line: {'color': 'blue', 'width': 3} }
+      { 
+        x: plotData.map((_, i) => i + 1), 
+        y: plotData.map(section => section.twist), 
+        type: 'scatter', 
+        mode: 'lines+markers', 
+        name: 'Twist Distribution' 
+      }
     ];
-  };
+  }  
+    
+  // Specific section selected (sectionIndex ≥ 0)
+  const sectionData = plotData[sectionIndex] || {};
+
+
+  const traces = [
+    { 
+      x: sectionData.xus, 
+      y: sectionData.zus, 
+      type: 'scatter', 
+      mode: 'lines', 
+      name: `Upper Surface - Section ${sectionIndex + 1}`,
+      line: {'color': 'red', 'width': 3} 
+    },
+    { 
+      x: sectionData.xls, 
+      y: sectionData.zls, 
+      type: 'scatter', 
+      mode: 'lines', 
+      name: `Lower Surface - Section ${sectionIndex + 1}`,
+      line: {'color': 'blue', 'width': 3} 
+    }
+  ];
+
+
+  if (newplotData) {
+    const newsectionData = newplotData[sectionIndex] || {};
+
+    // Add new computed airfoil if available (dashed lines)
+    if (newsectionData.xus_n && newsectionData.zus_n) {
+      traces.push(
+        { 
+          x: newsectionData.xus_n, 
+          y: newsectionData.zus_n, 
+          type: 'scatter', 
+          mode: 'lines', 
+          name: `Modified Upper - Section ${sectionIndex + 1}`,
+          line: {'color': 'red', 'width': 3, 'dash': 'dash'} 
+        },
+        {  
+          x: newsectionData.xls_n, 
+          y: newsectionData.zls_n, 
+          type: 'scatter', 
+          mode: 'lines', 
+          name: `Modified Lower - Section ${sectionIndex + 1}`,
+          line: {'color': 'blue', 'width': 3, 'dash': 'dash'} 
+        }
+      );
+    }
+  }
+  
+  
+  return traces;
+};
 
   return (
     <div className="app">
@@ -208,7 +279,7 @@ function GeometryModule() {
             )}
 
             {/* Render Plot3D with selected section OR all sections */}
-            {plotDataState && (
+            {plotData && (
               <Plot3D 
                 plotData =  {plot_trace(selectedSection)} selectedSection={selectedSection} 
               />
