@@ -36,3 +36,4 @@ yarn-error.log*
 >>>>>>> 161ec575dec49a0a957681d715f301f74d1135df
 
 /backend/Simulations
+yarn.lock
