@@ -112,13 +112,13 @@ echo 'files moved and tidied'
         batch_file.write(batch_contents)
 
 
-def copy_files_to_folder(destination_folder):
+def copy_files_to_folder(source_folder, destination_folder):
     """
     Copies all files from VFP-Solver (vfp-solver) to the simulation_folder.
 
     :param destination_folder: The path to the folder where files will be copied.
     """
-    source_folder = "./vfp-solver"  # Define the source folder here
+    # source_folder = "./vfp-solver"  # Define the source folder here
 
     if not os.path.exists(source_folder):
         raise FileNotFoundError(f"Source folder '{source_folder}' does not exist.")

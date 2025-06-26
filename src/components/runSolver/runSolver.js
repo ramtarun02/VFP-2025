@@ -12,6 +12,9 @@ function RunSolver() {
   const [simName, setsimName] = useState(""); 
   const [mach, setMach] = useState("");
   const [aoa, setAoA] = useState("");
+  const [alpha0, setA0] = useState("");
+  const [alphaN, setAN] = useState("");
+  const [dalpha, setdalpha] = useState("");
   const [reynolds, setReynolds] = useState("");
   const [dumpName, setDumpName] = useState("");
   const [continuation, setContinuation] = useState(false);
@@ -34,6 +37,9 @@ function RunSolver() {
     // Append text fields
     formData.append("mach", mach);
     formData.append("aoa", aoa);
+    formData.append("alpha0", alpha0);
+    formData.append("dalpha", dalpha);
+    formData.append("alphaN", alphaN)
     formData.append("reynolds", reynolds);
     formData.append("continuation", continuation);
     formData.append("dump", dump);
@@ -144,10 +150,28 @@ return (
       </div>
 
       {continuation && (
-        <label>
-          <input type="checkbox" className="dump-checkbox" onChange={() => {setDump(!dump)}}/>
-          Is this a continuation run at the same Mach and alpha 
-        </label>
+        <div className="cont-opts">
+
+          <div className="cont-opts-alpha"> 
+
+            <div className="alpha-group"> 
+              <label>Step</label>
+              <input value={dalpha} onChange={(e) => setdalpha(e.target.value)} />
+            </div>
+
+            <div className="alpha-group"> 
+              <label>End Angle of Attack</label>
+              <input value={alphaN} onChange={(e) => setAN(e.target.value)} />
+            </div>
+
+          </div>
+          
+          <div> 
+            <input type="checkbox" className="dump-checkbox" onChange={() => {setDump(!dump)}}/>
+            Is this a continuation run at the same Mach and alpha 
+          </div>
+
+        </div>
       )}
 
       <div className="button-group">

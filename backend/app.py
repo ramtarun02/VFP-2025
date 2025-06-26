@@ -4,6 +4,7 @@ from werkzeug.utils import secure_filename
 from flask_socketio import SocketIO, emit
 import os
 import shutil
+import signal
 import subprocess
 import runVFP as run
 import readGEO as rG
@@ -12,6 +13,8 @@ import io
 import math 
 import numpy as np
 
+
+current_process = None
 app = Flask(__name__)
 CORS(app)
 
@@ -122,6 +125,30 @@ def handle_connect():
     print("Client connected")
     emit('message', "WebSocket connection established")
 
+
+
+current_process = None  # Global reference
+
+def stream_process(command, cwd):
+    global current_process
+    try:
+        current_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=cwd)
+
+        # Stream output line-by-line
+        for line in iter(current_process.stdout.readline, ''):
+            if line:
+                clean_line = line.strip()
+                print(clean_line)
+                emit('message', clean_line)
+
+        current_process.stdout.close()
+        current_process.wait()
+        emit('message', 'Simulation completed successfully!')
+
+    except Exception as e:
+        emit('message', f"Error during execution: {str(e)}")
+
+
 @socketio.on('start_simulation')
 def start_simulation(data=None):
     if data and 'simName' in data:
@@ -145,11 +172,14 @@ def start_simulation(data=None):
             for filename in os.listdir(sim_folder):
                 # Check file extensions
                 if filename.endswith(".map"):
+                    # map_file = filename
                     map_file = os.path.splitext(filename)[0]  # Remove extension
                 elif filename.endswith(".GEO"):
+                    # geo_file = filename
                     geo_file = os.path.splitext(filename)[0]  # Remove extension
                 elif filename.endswith(".dat"):
-                    dat_file = os.path.splitext(filename)[0]  # Remove extension
+                    dat_file = filename
+                    # dat_file = os.path.splitext(filename)[0]  # Remove extension
             
 
             dump_file = data['dumpName']
@@ -176,47 +206,54 @@ def start_simulation(data=None):
 
             emit('message', f"Simulation started for {sim_name}")
 
-            emit('message', run.copy_files_to_folder(sim_folder))
+            emit('message', run.copy_files_to_folder("./vfp-solver", sim_folder))
+            run.copy_files_to_folder("./Python Utils", sim_folder)
 
-            try:
-                run.create_batch_file(map_file, geo_file, dat_file, dump_file, exc, con, dump, sim_folder)
-                emit('message', "Batch File Created Successfully. Attempting to Run the VFP.exe")
+             # Now use this function based on `con` value
+            if con == 'y':
+                stream_process(["python", "VFP_Full_Process.py", dat_file, data["dalpha"], data["alphaN"], map_file, geo_file], sim_folder)
+            else:
+                stream_process(["python", "VFP_Full_Process.py", dat_file, "1", "1", map_file, geo_file], sim_folder)
 
-            except Exception as e:
-                emit('message', f'Error: {str(e)}')
+            # try:
+            #     run.create_batch_file(map_file, geo_file, dat_file, dump_file, exc, con, dump, sim_folder)
+            #     emit('message', "Batch File Created Successfully. Attempting to Run the VFP.exe")
+
+            # except Exception as e:
+            #     emit('message', f'Error: {str(e)}')
 
 
 
-            # bat_file_path = os.path.join(sim_folder, "run_vfp.bat")
+            # # bat_file_path = os.path.join(sim_folder, "run_vfp.bat")
 
 
-            try:
-                # Execute the batch file and capture output in real-time
-                process = subprocess.Popen(bat_file_path, shell= True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=os.path.dirname(bat_file_path))
+            # try:
+            #     # Execute the batch file and capture output in real-time
+            #     process = subprocess.Popen(bat_file_path, shell= True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=os.path.dirname(bat_file_path))
 
-                # Read and print output in real-time
-                while True:
-                    output = process.stdout.readline()
-                    if output == "" and process.poll() is not None:
-                        break
-                    if output:
-                        print(output.strip())
-                        emit('message', output.strip())
+            #     # Read and print output in real-time
+            #     while True:
+            #         output = process.stdout.readline()
+            #         if output == "" and process.poll() is not None:
+            #             break
+            #         if output:
+            #             print(output.strip())
+            #             emit('message', output.strip())
 
-                # Emit any error messages if necessary
-                for line in iter(process.stderr.readline, ''):
-                    emit('message', line.strip())
+            #     # Emit any error messages if necessary
+            #     for line in iter(process.stderr.readline, ''):
+            #         emit('message', line.strip())
 
-                # Wait for the process to finish
-                process.stdout.close()
-                process.stderr.close()
-                process.wait()
+            #     # Wait for the process to finish
+            #     process.stdout.close()
+            #     process.stderr.close()
+            #     process.wait()
 
                 # Emit a final message once the batch file execution completes
-                emit('message', 'Simulation completed successfully!')
+                # emit('message', 'Simulation completed successfully!')
 
-            except Exception as e:
-                emit('message',  f'Error: {str(e)}')
+            # except Exception as e:
+            #     emit('message',  f'Error: {str(e)}')
 
         except Exception as e:
             print(f"Error processing simulation data: {e}")
@@ -261,6 +298,9 @@ def handle_download(data):
 @socketio.on('disconnect')
 def handle_disconnect():
     print("Client disconnected")
+
+ 
+
 
 
 

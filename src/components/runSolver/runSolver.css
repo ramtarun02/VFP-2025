@@ -30,10 +30,11 @@
   background: #e2e8f0;
   padding: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 500px;
+  width: 600px;
   height: 500px;
   text-align: center;
   border-radius: 25px;
+  overflow-y: auto;
 }
 
 .back-button {
@@ -175,4 +176,31 @@ input {
 .run-button:hover span:after {
   opacity: 1;
   right: 0;
+}
+
+.cont-opts {
+  display: flex;
+  flex-direction: column;
+}
+
+.cont-opts-alpha {
+  display: flex;
+  gap: 20px; /* space between inputs */
+  margin: 8px;
+  justify-content: center;
+}
+
+.alpha-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.alpha-group label {
+  margin-bottom: 3.5px;
+  font-weight: bold;
+}
+
+.alpha-group input {
+  padding: 8px;
+  width: 150px;
 }
