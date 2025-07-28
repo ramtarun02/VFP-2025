@@ -329,10 +329,8 @@ def import_geo():
     try:
         # Pass the file to the readGEO function
         geo_data = rG.readGEO(file_path)
-        points = rG.airfoils(geo_data)
-        # Convert the structured array to JSON
-        # plotly_format = rG.convert_to_plotly_format(points)
-
+        import copy
+        points = rG.airfoils(copy.deepcopy(geo_data))
         # Return the JSON response
         return jsonify({'geoData': geo_data, 'plotData': points}), 200
 
@@ -432,64 +430,73 @@ def compute_desired():
     sec = section_index
     i = sec  # converting to 0-based index
     print(i)
-    # Extract parameters
-    dtwist = float(parameters['Twist'])
-    ntwist = (dtwist - plot_data[sec]['twist']) * (np.pi / 180)
-    
-    dHSECT = float(parameters['Dihedral'])
-    nHSECT = dHSECT - geo_data[sec]['HSECT']
-    
-    dchord = float(parameters['Chord'])
-    scale = dchord / (geo_data[i]['G2SECT'] - geo_data[i]['G1SECT'])
-    
+
     dXLE = float(parameters['XLE'])
+
+    geo_data[i]['G2SECT'] += (dXLE - geo_data[i]['G1SECT'])    
+    geo_data[i]['G1SECT'] = dXLE
+
+
+    print(geo_data[i]['G1SECT'], geo_data[i]['G2SECT'])
+
+    # # Extract parameters
+    # dtwist = float(parameters['Twist'])
+    # ntwist = (dtwist - plot_data[sec]['twist']) * (np.pi / 180)
     
-    # Extract X and Z coordinates (assuming US is a list of [x,z] pairs)
-    xus_orig = [point[0] for point in geo_data[i]['US']]  # List of X-coordinates
-    zus_orig = [point[1] for point in geo_data[i]['US']]  # List of Z-coordinates
+    # dHSECT = float(parameters['Dihedral'])
+    # nHSECT = dHSECT - geo_data[sec]['HSECT']
     
-    nXLE = dXLE - xus_orig[0] - ((xus_orig[0] * (scale - 1)))
-    nZLE = zus_orig[0] * (scale - 1)
+    # dchord = float(parameters['Chord'])
+    # scale = dchord / (geo_data[i]['G2SECT'] - geo_data[i]['G1SECT'])
     
-    dysect = float(parameters['YSECT'])
+    # dXLE = float(parameters['XLE'])
     
-    # Update values based on changes
-    if round(ntwist, 5) != 0:
-        geo_data[i]['NTWIST'] = plot_data[i]['twist'] + ntwist / (np.pi / 180)
+    # # Extract X and Z coordinates (assuming US is a list of [x,z] pairs)
+    # xus_orig = [point[0] for point in geo_data[i]['US']]  # List of X-coordinates
+    # zus_orig = [point[1] for point in geo_data[i]['US']]  # List of Z-coordinates
     
-    if round(nHSECT, 5) != 0:
-        geo_data[i]['NHSECT'] = dHSECT
+    # nXLE = dXLE - xus_orig[0] - ((xus_orig[0] * (scale - 1)))
+    # nZLE = zus_orig[0] * (scale - 1)
     
-    if round(dysect - geo_data[i]['YSECT'], 4) != 0:
-        geo_data[i]['NYSECT'] = dysect
+    # dysect = float(parameters['YSECT'])
     
-    # Calculate new coordinates (Upper Surface)
-    xus_n = []
-    zus_n = []
-    for n in range(len(xus_orig)):
-        x = ((geo_data[i]['G1SECT'] + ((-geo_data[i]['G1SECT'] + xus_orig[n]) * np.cos(ntwist)) + 
-             ((zus_orig[n] - geo_data[i]['HSECT']) * np.sin(ntwist))) * scale) + nXLE
-        z = ((geo_data[i]['HSECT'] - ((-geo_data[i]['G1SECT'] + xus_orig[n]) * np.sin(ntwist)) + 
-             ((zus_orig[n] - geo_data[i]['HSECT']) * np.cos(ntwist))) * scale) - nZLE
-        xus_n.append(x)
-        zus_n.append(z)
+    # # Update values based on changes
+    # if round(ntwist, 5) != 0:
+    #     geo_data[i]['NTWIST'] = plot_data[i]['twist'] + ntwist / (np.pi / 180)
     
-    # Calculate new coordinates (Lower Surface)
-    xls_orig = [point[0] for point in geo_data[i]['LS']]  # List of X-coordinates
-    zls_orig = [point[1] for point in geo_data[i]['LS']]  # List of Z-coordinates
-    xls_n = []
-    zls_n = []
-    for n in range(len(xls_orig)):
-        x = ((geo_data[i]['G1SECT'] + ((-geo_data[i]['G1SECT'] + xls_orig[n]) * np.cos(ntwist)) + 
-             ((zls_orig[n] - geo_data[i]['HSECT']) * np.sin(ntwist))) * scale) + nXLE
-        z = ((geo_data[i]['HSECT'] - ((-geo_data[i]['G1SECT'] + xls_orig[n]) * np.sin(ntwist)) + 
-             ((zls_orig[n] - geo_data[i]['HSECT']) * np.cos(ntwist))) * scale) - nZLE
-        xls_n.append(x)
-        zls_n.append(z)
+    # if round(nHSECT, 5) != 0:
+    #     geo_data[i]['NHSECT'] = dHSECT
     
-    # Update the geometry data with new coordinates (as lists of [x,z] pairs)
-    geo_data[i]['US_N'] = [[x, z] for x, z in zip(xus_n, zus_n)]
-    geo_data[i]['LS_N'] = [[x, z] for x, z in zip(xls_n, zls_n)]
+    # if round(dysect - geo_data[i]['YSECT'], 4) != 0:
+    #     geo_data[i]['NYSECT'] = dysect
+    
+    # # Calculate new coordinates (Upper Surface)
+    # xus_n = []
+    # zus_n = []
+    # for n in range(len(xus_orig)):
+    #     x = ((geo_data[i]['G1SECT'] + ((-geo_data[i]['G1SECT'] + xus_orig[n]) * np.cos(ntwist)) + 
+    #          ((zus_orig[n] - geo_data[i]['HSECT']) * np.sin(ntwist))) * scale) + nXLE
+    #     z = ((geo_data[i]['HSECT'] - ((-geo_data[i]['G1SECT'] + xus_orig[n]) * np.sin(ntwist)) + 
+    #          ((zus_orig[n] - geo_data[i]['HSECT']) * np.cos(ntwist))) * scale) - nZLE
+    #     xus_n.append(x)
+    #     zus_n.append(z)
+    
+    # # Calculate new coordinates (Lower Surface)
+    # xls_orig = [point[0] for point in geo_data[i]['LS']]  # List of X-coordinates
+    # zls_orig = [point[1] for point in geo_data[i]['LS']]  # List of Z-coordinates
+    # xls_n = []
+    # zls_n = []
+    # for n in range(len(xls_orig)):
+    #     x = ((geo_data[i]['G1SECT'] + ((-geo_data[i]['G1SECT'] + xls_orig[n]) * np.cos(ntwist)) + 
+    #          ((zls_orig[n] - geo_data[i]['HSECT']) * np.sin(ntwist))) * scale) + nXLE
+    #     z = ((geo_data[i]['HSECT'] - ((-geo_data[i]['G1SECT'] + xls_orig[n]) * np.sin(ntwist)) + 
+    #          ((zls_orig[n] - geo_data[i]['HSECT']) * np.cos(ntwist))) * scale) - nZLE
+    #     xls_n.append(x)
+    #     zls_n.append(z)
+    
+    # # Update the geometry data with new coordinates (as lists of [x,z] pairs)
+    # geo_data[i]['US_N'] = [[x, z] for x, z in zip(xus_n, zus_n)]
+    # geo_data[i]['LS_N'] = [[x, z] for x, z in zip(xls_n, zls_n)]
 
     plot_data2 = rG.airfoils(geo_data)
 

@@ -111,19 +111,20 @@ def interpolate_airfoil(airfoil_points, num_points=10000):
     
     return interpolated_points, x_new, y_new
 
-def airfoils(Sections):
+def airfoils(Sect):
  
+    Sect2 = Sect
     # Check if all sections have US and LS starting with (0, 0)
-    if all(s['US'][0][0] == 0 and s['LS'][0][0] == 0 for s in Sections):
+    if all(s['US'][0][0] == 0 and s['LS'][0][0] == 0 for s in Sect2):
         # If condition is met, perform the transformation for all sections
-        for s in Sections:
+        for s in Sect2:
             s['US'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['US']]
             s['LS'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['LS']]
 
     Points = []
 
     try:
-        for s in Sections:
+        for s in Sect2:
             _, x_new, z_new = interpolate_airfoil(s['US'], num_points=10000)
             xus = x_new
             zus = z_new
@@ -132,7 +133,7 @@ def airfoils(Sections):
             zls = z_new
 
             y = [s['YSECT'] for _ in range(len(xls))]
-            print("Interpolation Done")
+            # print("Interpolation Done")
 
             # Thickness to chord ratio and camber line
             t_max = max(zus[i] - zls[i] for i in range(len(zus)))

@@ -29,8 +29,9 @@ function GeometryModule() {
         body: formData,
       });
 
-      const { geoData, plotData } = await response.json();
-      console.log("Received Data:", { geoData, plotData });
+      const {geoData, plotData} = await response.json();
+
+      console.log("File Import Response Received Data:", { geoData, plotData });
 
       if (plotData) {
         setGeoData(geoData);
@@ -124,8 +125,8 @@ function GeometryModule() {
         // Update the state with new data
         setnewGeoData(updatedGeoData);
         setnewPlotData(updatedPlotData);
-        // Reset modified parameters
-        setModifiedParameters({});
+        // // Reset modified parameters
+        // setModifiedParameters({});
         // Update the parameters display
         updateParameters(selectedSection);
         }
@@ -205,19 +206,19 @@ function GeometryModule() {
     const newsectionData = newplotData[sectionIndex] || {};
 
     // Add new computed airfoil if available (dashed lines)
-    if (newsectionData.xus_n && newsectionData.zus_n) {
+    if (newsectionData.xus && newsectionData.zus) {
       traces.push(
         { 
-          x: newsectionData.xus_n, 
-          y: newsectionData.zus_n, 
+          x: newsectionData.xus, 
+          y: newsectionData.zus, 
           type: 'scatter', 
           mode: 'lines', 
           name: `Modified Upper - Section ${sectionIndex + 1}`,
           line: {'color': 'red', 'width': 3, 'dash': 'dash'} 
         },
         {  
-          x: newsectionData.xls_n, 
-          y: newsectionData.zls_n, 
+          x: newsectionData.xls, 
+          y: newsectionData.zls, 
           type: 'scatter', 
           mode: 'lines', 
           name: `Modified Lower - Section ${sectionIndex + 1}`,
