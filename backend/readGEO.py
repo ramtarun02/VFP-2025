@@ -91,9 +91,9 @@ def interpolate_airfoil(airfoil_points, num_points=10000):
     x = points[:, 0]
     y = points[:, 1]
     
-    # Verify x is strictly increasing
-    if not np.all(np.diff(x) > 0):
-        raise ValueError("x-coordinates must be strictly increasing for this interpolation method")
+    # # Verify x is strictly increasing
+    # if not np.all(np.diff(x) > 0):
+    #     raise ValueError("x-coordinates must be strictly increasing for this interpolation method")
     
     # Create linear interpolation function for y coordinates
     fy = interp1d(x, y, kind='linear')

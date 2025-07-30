@@ -125,8 +125,8 @@ function GeometryModule() {
         // Update the state with new data
         setnewGeoData(updatedGeoData);
         setnewPlotData(updatedPlotData);
-        // // Reset modified parameters
-        // setModifiedParameters({});
+        // Reset modified parameters
+        setModifiedParameters({});
         // Update the parameters display
         updateParameters(selectedSection);
         }
