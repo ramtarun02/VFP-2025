@@ -202,23 +202,23 @@ function GeometryModule() {
   ];
 
 
-  if (newplotData) {
-    const newsectionData = newplotData[sectionIndex] || {};
+  if (newgeoData) {
+    const newsectionData = newgeoData[sectionIndex] || {};
 
     // Add new computed airfoil if available (dashed lines)
-    if (newsectionData.xus && newsectionData.zus) {
+    if (newsectionData.XUS_N && newsectionData.ZUS_N) {
       traces.push(
         { 
-          x: newsectionData.xus, 
-          y: newsectionData.zus, 
+          x: newsectionData.XUS_N, 
+          y: newsectionData.ZUS_N, 
           type: 'scatter', 
           mode: 'lines', 
           name: `Modified Upper - Section ${sectionIndex + 1}`,
           line: {'color': 'red', 'width': 3, 'dash': 'dash'} 
         },
         {  
-          x: newsectionData.xls, 
-          y: newsectionData.zls, 
+          x: newsectionData.XLS_N, 
+          y: newsectionData.ZLS_N, 
           type: 'scatter', 
           mode: 'lines', 
           name: `Modified Lower - Section ${sectionIndex + 1}`,

@@ -6,4 +6,5 @@ python-socketio==5.10.0
 numpy
 scipy
 pandas
+matplotlib
 

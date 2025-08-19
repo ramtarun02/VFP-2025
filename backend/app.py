@@ -419,6 +419,8 @@ def compute():
     })
 
 
+import math
+
 @app.route('/compute_desired', methods=['POST'])
 def compute_desired():
     data = request.get_json()
@@ -432,84 +434,111 @@ def compute_desired():
     i = sec  # converting to 0-based index
     print(i)
 
-    chord= (geo_data[i]['G2SECT'] - geo_data[i]['G1SECT'])
-    nXLE = float(parameters['XLE'])
-    nXTE = float(parameters['XTE'])
-    ntwist = float(parameters['Twist'])
-    nchord = float(parameters['Chord'])
-    scale = nchord/chord
+    # Extract current section data
+    current_section = geo_data[i]
+    
+    # Calculate current chord
+    chord = current_section['G2SECT'] - current_section['G1SECT']
 
-    ## Modify Section    
-    # Change Leading Edge of Section
+    # Parse upper and lower surface coordinates from [x, y] format to separate X and Z arrays
+    current_section['XUS'] = [point[0] for point in current_section['US']]
+    current_section['ZUS'] = [point[1] for point in current_section['US']]
+    current_section['XLS'] = [point[0] for point in current_section['LS']]
+    current_section['ZLS'] = [point[1] for point in current_section['LS']]
+    
+    
+    # Extract new parameters
+    dXLE = float(parameters['XLE'])
+    dtwist = float(parameters['Twist'])
+    dHSECT = float(parameters.get('HSECT', current_section['HSECT']))  # Default to current if not provided
+    dchord = float(parameters['Chord'])
+    dysect = float(parameters.get('YSECT', current_section['YSECT']))  # Default to current if not provided
+    
+    # Calculate differences and transformations
+    # Assuming geo_data contains twist in degrees, convert difference to radians
+    current_twist_deg = current_section.get('twist', 0)  # Current twist in degrees
+    ntwist = (dtwist - current_twist_deg) * (math.pi / 180)  # Difference in radians
+    
+    nHSECT = dHSECT - current_section['HSECT']
+    scale = dchord / chord
+    
+    # Calculate XLE offset
+    nXLE = dXLE - current_section['XUS'][0] - (current_section['XUS'][0] * (scale - 1))
+    nZLE = current_section['ZUS'][0] * (scale - 1)
 
-    if round(nXLE - geo_data[i]['G1SECT'], 3) != 0:
-        geo_data[i]['G2SECT'] = nXLE + chord  
-        geo_data[i]['G1SECT'] = nXLE
-        print(geo_data[i]['G1SECT'], geo_data[i]['G2SECT'])
-    else:
-        print("No Modification")
+    ## Modify Section
+    
+    # Update twist if changed (round to 5 decimal places for comparison)
+    if round(ntwist, 5) != 0:
+        new_twist_deg = current_twist_deg + ntwist * (180 / math.pi)
+        current_section['twist'] = new_twist_deg
+        current_section['NTWIST'] = new_twist_deg
+    
+    # Update HSECT if changed
+    if round(nHSECT, 5) != 0:
+        current_section['NHSECT'] = dHSECT
+    
+    # Update YSECT if changed
+    if round(dysect - current_section['YSECT'], 4) != 0:
+        current_section['NYSECT'] = dysect
+    
+    # Update chord if changed
+    if round(dchord - chord, 5) != 0:
+        current_section['NCHORD'] = dchord
+    
+    # Update XLE if changed
+    if round(nXLE, 4) != 0:
+        current_section['NXLE'] = dXLE
 
+    # Transform upper surface coordinates (XUS, ZUS)
+    if 'XUS_N' not in current_section:
+        current_section['XUS_N'] = []
+        current_section['ZUS_N'] = []
+    
+    current_section['XUS_N'] = []
+    current_section['ZUS_N'] = []
+    
+    for n in range(len(current_section['XUS'])):
+        x_us = current_section['XUS'][n]
+        z_us = current_section['ZUS'][n]
+        g1_sect = current_section['G1SECT']
+        h_sect = current_section['HSECT']
+        
+        # Apply transformation: rotation + scaling + translation
+        x_us_n = ((g1_sect + ((-g1_sect + x_us) * math.cos(ntwist)) + 
+                   ((z_us - h_sect) * math.sin(ntwist))) * scale) + nXLE
+        
+        z_us_n = ((h_sect - ((-g1_sect + x_us) * math.sin(ntwist)) + 
+                   ((z_us - h_sect) * math.cos(ntwist))) * scale) - nZLE
+        
+        current_section['XUS_N'].append(x_us_n)
+        current_section['ZUS_N'].append(z_us_n)
 
-    if round(nXTE - geo_data[i]['G2SECT'], 3) != 0:
-        geo_data[i]['G1SECT'] = nXTE - chord  
-        geo_data[i]['G2SECT'] = nXTE
-        print(geo_data[i]['G1SECT'], geo_data[i]['G2SECT'])
-    else:
-        print("No Modification")
+    # Transform lower surface coordinates (XLS, ZLS)
+    if 'XLS_N' not in current_section:
+        current_section['XLS_N'] = []
+        current_section['ZLS_N'] = []
+    
+    current_section['XLS_N'] = []
+    current_section['ZLS_N'] = []
+    
+    for n in range(len(current_section['XLS'])):
+        x_ls = current_section['XLS'][n]
+        z_ls = current_section['ZLS'][n]
+        g1_sect = current_section['G1SECT']
+        h_sect = current_section['HSECT']
+        
+        # Apply transformation: rotation + scaling + translation
+        x_ls_n = ((g1_sect + ((-g1_sect + x_ls) * math.cos(ntwist)) + 
+                   ((z_ls - h_sect) * math.sin(ntwist))) * scale) + nXLE
+        
+        z_ls_n = ((h_sect - ((-g1_sect + x_ls) * math.sin(ntwist)) + 
+                   ((z_ls - h_sect) * math.cos(ntwist))) * scale) - nZLE
+        
+        current_section['XLS_N'].append(x_ls_n)
+        current_section['ZLS_N'].append(z_ls_n)
 
-
-    # Change Chord of the Section
-
-    if round(scale, 3) != 1:
-
-        pass
-
-    # # --- DEBUG: Plot coordinates before twist ---
-    # us_before = np.array(geo_data[i]['US'])
-    # ls_before = np.array(geo_data[i]['LS'])
-    # plt.figure()
-    # plt.plot(us_before[:, 0], us_before[:, 1], label='US before twist')
-    # plt.plot(ls_before[:, 0], ls_before[:, 1], label='LS before twist')
-    # plt.title(f'Section {i} - Before Twist')
-    # plt.legend()
-    # plt.savefig(f'debug_section_{i}_before_twist.png')
-    # plt.close()
-
-    # --- Apply twist to airfoil coordinates ---
-
-    if round(ntwist - geo_data[i]['TWIST'], 3) != 0:
-        # --- Apply twist to airfoil coordinates ---
-        theta = math.radians(ntwist)
-        # geo_data[i]['US'] and geo_data[i]['LS'] are lists of [x, z]
-    # --- Apply twist to airfoil coordinates (clockwise about x_pivot) ---
-        def rotate(coords, theta, x_pivot):
-            coords = np.array(coords)
-            # Shift x so rotation is about x_pivot, then rotate, then shift back
-            x_shifted = coords[:, 0] - x_pivot
-            z_shifted = coords[:, 1]
-            x_rot = x_shifted * math.cos(-theta) - z_shifted * math.sin(-theta)
-            z_rot = x_shifted * math.sin(-theta) + z_shifted * math.cos(-theta)
-            x_final = x_rot + x_pivot
-            z_final = z_rot
-            return np.column_stack((x_final, z_final)).tolist()
-
-        geo_data[i]['US'] = rotate(geo_data[i]['US'], theta, geo_data[i]['XTWSEC'])
-        geo_data[i]['LS'] = rotate(geo_data[i]['LS'], theta, geo_data[i]['XTWSEC'])
-
-    else:
-        print("No Modification")
-
-    # # --- DEBUG: Plot coordinates after twist ---
-    # us_after = np.array(geo_data[i]['US'])
-    # ls_after = np.array(geo_data[i]['LS'])
-    # plt.figure()
-    # plt.plot(us_after[:, 0], us_after[:, 1], label='US after twist')
-    # plt.plot(ls_after[:, 0], ls_after[:, 1], label='LS after twist')
-    # plt.title(f'Section {i} - After Twist')
-    # plt.legend()
-    # plt.savefig(f'debug_section_{i}_after_twist.png')
-    # plt.close()
-
+    # Generate updated plot data
     plot_data2 = rG.airfoils(geo_data)
 
     return jsonify({
