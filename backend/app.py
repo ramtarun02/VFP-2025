@@ -448,29 +448,29 @@ def compute_desired():
     
     
     # Extract new parameters
-    dXLE = float(parameters['XLE'])
-    dtwist = float(parameters['Twist'])
+    nXLE = float(parameters['XLE'])
+    ntwist = float(parameters['Twist'])
     dHSECT = float(parameters.get('HSECT', current_section['HSECT']))  # Default to current if not provided
     dchord = float(parameters['Chord'])
     dysect = float(parameters.get('YSECT', current_section['YSECT']))  # Default to current if not provided
     
     # Calculate differences and transformations
     # Assuming geo_data contains twist in degrees, convert difference to radians
-    current_twist_deg = current_section.get('twist', 0)  # Current twist in degrees
-    ntwist = (dtwist - current_twist_deg) * (math.pi / 180)  # Difference in radians
+    current_twist_deg = current_section['TWIST']  # Current twist in degrees
+    dtwist = (ntwist - current_twist_deg) * (math.pi / 180)  # Difference in radians
     
     nHSECT = dHSECT - current_section['HSECT']
     scale = dchord / chord
     
     # Calculate XLE offset
-    nXLE = dXLE - current_section['XUS'][0] - (current_section['XUS'][0] * (scale - 1))
+    dXLE = nXLE - current_section['XUS'][0] - (current_section['XUS'][0] * (scale - 1))
     nZLE = current_section['ZUS'][0] * (scale - 1)
 
     ## Modify Section
     
     # Update twist if changed (round to 5 decimal places for comparison)
-    if round(ntwist, 5) != 0:
-        new_twist_deg = current_twist_deg + ntwist * (180 / math.pi)
+    if round(dtwist, 5) != 0:
+        new_twist_deg = current_twist_deg + dtwist * (180 / math.pi)
         current_section['twist'] = new_twist_deg
         current_section['NTWIST'] = new_twist_deg
     
@@ -487,8 +487,8 @@ def compute_desired():
         current_section['NCHORD'] = dchord
     
     # Update XLE if changed
-    if round(nXLE, 4) != 0:
-        current_section['NXLE'] = dXLE
+    if round(dXLE, 4) != 0:
+        current_section['NXLE'] = nXLE
 
     # Transform upper surface coordinates (XUS, ZUS)
     if 'XUS_N' not in current_section:
@@ -505,14 +505,20 @@ def compute_desired():
         h_sect = current_section['HSECT']
         
         # Apply transformation: rotation + scaling + translation
-        x_us_n = ((g1_sect + ((-g1_sect + x_us) * math.cos(ntwist)) + 
-                   ((z_us - h_sect) * math.sin(ntwist))) * scale) + nXLE
+        x_us_n = ((((x_us) * math.cos(-dtwist)) - ((z_us) * math.sin(-dtwist))) * scale) + dXLE
         
-        z_us_n = ((h_sect - ((-g1_sect + x_us) * math.sin(ntwist)) + 
-                   ((z_us - h_sect) * math.cos(ntwist))) * scale) - nZLE
+        z_us_n = ((((x_us) * math.sin(-dtwist)) + ((z_us) * math.cos(-dtwist))) * scale) + nZLE
         
         current_section['XUS_N'].append(x_us_n)
         current_section['ZUS_N'].append(z_us_n)
+
+
+    # for n in range(len(current_section['XUS'])):
+    #     x0 = current_section['XUS_N'][0]
+    #     z0 = current_section['ZUS_N'][0]
+
+    #     current_section['XUS_N'][n] -= x0
+    #     current_section['ZUS_N'][n] -= z0
 
     # Transform lower surface coordinates (XLS, ZLS)
     if 'XLS_N' not in current_section:
@@ -523,20 +529,27 @@ def compute_desired():
     current_section['ZLS_N'] = []
     
     for n in range(len(current_section['XLS'])):
+
         x_ls = current_section['XLS'][n]
         z_ls = current_section['ZLS'][n]
         g1_sect = current_section['G1SECT']
         h_sect = current_section['HSECT']
         
         # Apply transformation: rotation + scaling + translation
-        x_ls_n = ((g1_sect + ((-g1_sect + x_ls) * math.cos(ntwist)) + 
-                   ((z_ls - h_sect) * math.sin(ntwist))) * scale) + nXLE
+        x_ls_n = ((((x_ls) * math.cos(-dtwist)) - ((z_ls) * math.sin(-dtwist))) * scale) + dXLE
         
-        z_ls_n = ((h_sect - ((-g1_sect + x_ls) * math.sin(ntwist)) + 
-                   ((z_ls - h_sect) * math.cos(ntwist))) * scale) - nZLE
+        z_ls_n = ((((x_ls) * math.sin(-dtwist)) + ((z_ls) * math.cos(-dtwist))) * scale) - nZLE
         
         current_section['XLS_N'].append(x_ls_n)
         current_section['ZLS_N'].append(z_ls_n)
+
+    # for n in range(len(current_section['XLS'])):
+    #     x0 = current_section['XLS_N'][0]
+    #     z0 = current_section['ZLS_N'][0]
+
+    #     current_section['XLS_N'][n] -= x0
+    #     current_section['ZLS_N'][n] -= z0
+
 
     # Generate updated plot data
     plot_data2 = rG.airfoils(geo_data)

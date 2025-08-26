@@ -111,58 +111,98 @@ def interpolate_airfoil(airfoil_points, num_points=10000):
     
     return interpolated_points, x_new, y_new
 
-def airfoils(Sect):
- 
-    Sect2 = Sect
+import math
+from typing import List, Dict, Tuple, Any
+
+def airfoils(Sect: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Process airfoil section data with coordinate transformation and aerodynamic calculations.
+    
+    Args:
+        Sect: List of section dictionaries containing 'US', 'LS', 'G1SECT', 'G2SECT', 'YSECT'
+        
+    Returns:
+        List of processed airfoil data dictionaries
+    """
+    Sect2 = Sect.copy()  # Make a copy to avoid modifying original data
+    
     # Check if all sections have US and LS starting with (0, 0)
     if all(s['US'][0][0] == 0 and s['LS'][0][0] == 0 for s in Sect2):
-        # If condition is met, perform the transformation for all sections
+        # Perform coordinate transformation for all sections
         for s in Sect2:
-            s['US'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['US']]
-            s['LS'] = [(x * (s['G2SECT'] - s['G1SECT']) + s['G1SECT'], y * (s['G2SECT'] - s['G1SECT'])) for x, y in s['LS']]
+            chord_length = s['G2SECT'] - s['G1SECT']
+            s['US'] = [(x * chord_length + s['G1SECT'], y * chord_length) 
+                      for x, y in s['US']]
+            s['LS'] = [(x * chord_length + s['G1SECT'], y * chord_length) 
+                      for x, y in s['LS']]
 
     Points = []
 
     try:
         for s in Sect2:
-            _, x_new, z_new = interpolate_airfoil(s['US'], num_points=10000)
-            xus = x_new
-            zus = z_new
-            _, x_new, z_new = interpolate_airfoil(s['LS'], num_points=10000)
-            xls = x_new
-            zls = z_new
+            # Interpolate airfoil surfaces
+            _, xus, zus = interpolate_airfoil(s['US'], num_points=10000)
+            _, xls, zls = interpolate_airfoil(s['LS'], num_points=10000)
 
-            y = [s['YSECT'] for _ in range(len(xls))]
-            # print("Interpolation Done")
+            # Check if normalized coordinates exist and interpolate them too
+            xus_n, zus_n, xls_n, zls_n = [], [], [], []
+            if all(key in s for key in ['XUS_N', 'ZUS_N', 'XLS_N', 'ZLS_N']):
+                # Create coordinate pairs for interpolation
+                us_n_coords = list(zip(s['XUS_N'], s['ZUS_N']))
+                ls_n_coords = list(zip(s['XLS_N'], s['ZLS_N']))
+                
+                # Interpolate normalized coordinates
+                _, xus_n, zus_n = interpolate_airfoil(us_n_coords, num_points=10000)
+                _, xls_n, zls_n = interpolate_airfoil(ls_n_coords, num_points=10000)
 
-            # Thickness to chord ratio and camber line
-            t_max = max(zus[i] - zls[i] for i in range(len(zus)))
-            c = s['G2SECT'] - s['G1SECT']
-            t_c = t_max / c
-            camber = [(abs(zus[i] - zls[i]) / 2) + zls[i] for i in range(len(zus))]
+            # Create y-coordinates (constant for each section)
+            y = [s['YSECT']] * len(xls)
+
+            # Calculate aerodynamic properties
+            chord_length = s['G2SECT'] - s['G1SECT']
             
-            # Twist calculation
+            # Maximum thickness and thickness-to-chord ratio
+            thickness_distribution = [zus[i] - zls[i] for i in range(len(zus))]
+            t_max = max(thickness_distribution)
+            t_c = t_max / chord_length if chord_length != 0 else 0
+            
+            # Calculate aerodynamic properties
+            chord_length = s['G2SECT'] - s['G1SECT']
+            
+            # Maximum thickness and thickness-to-chord ratio
+            thickness_distribution = [zus[i] - zls[i] for i in range(len(zus))]
+            t_max = max(thickness_distribution)
+            t_c = t_max / chord_length if chord_length != 0 else 0
+            
+            # Camber line (mean line between upper and lower surfaces)
+            camber = [(zus[i] + zls[i]) / 2 for i in range(len(zus))]
+            
+            # Twist calculation based on leading/trailing edge height difference
             z_diff = abs(zus[0] - zus[-1])
-            x_diff = s['G2SECT'] - s['G1SECT']
-            twist = (math.degrees(math.atan(z_diff / x_diff))) * (-1 if zus[0] < zus[-1] else 1)
+            x_diff = chord_length
+            twist = (math.degrees(math.atan(z_diff / x_diff)) if x_diff != 0 else 0) * (-1 if zus[0] < zus[-1] else 1)
             
-        
-            xus_n = []
-            zus_n = []
-            xls_n = []
-            zls_n = []
-        
-
-
+            # Append processed data to Points array
             Points.append({
-                'y': y, 'xus': xus, 'zus': zus, 'xls': xls, 'zls': zls,
-                't_c': t_c, 'camber': camber, 'twist': twist, 'xus_n': xus_n, 'zus_n': zus_n, 
-                'xls_n': xls_n, 'zls_n': zls_n
+                'y': y, 
+                'xus': xus, 
+                'zus': zus, 
+                'xls': xls, 
+                'zls': zls,
+                't_c': t_c, 
+                'camber': camber, 
+                'twist': twist, 
+                'xus_n': xus_n, 
+                'zus_n': zus_n, 
+                'xls_n': xls_n, 
+                'zls_n': zls_n
             })
-
 
         return Points
  
     except ValueError as e:
         print(f"Error: {e}")
-
+        return []
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return []
