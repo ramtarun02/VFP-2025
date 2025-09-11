@@ -149,7 +149,7 @@ return (
         </label>
       </div>
 
-      {continuation && (
+      {autoRunner && (
         <div className="cont-opts">
 
           <div className="cont-opts-alpha"> 

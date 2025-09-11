@@ -192,6 +192,7 @@ def start_simulation(data=None):
             
             # Extract boolean values and store as 'y' (true) or 'n' (false)
             con= 'y' if data.get("continuation", "false").lower() == "true" else 'n'
+            auto= 'y' if data.get("autoRunner", "false").lower() == "true" else 'n'
             exc = 'y' if data.get("excrescence", "false").lower() == "true" else 'n'
             dump = 'y' if data.get("dump", "false").lower() == "true" else 'n'
             print(exc, con, dump)
@@ -211,50 +212,11 @@ def start_simulation(data=None):
             run.copy_files_to_folder("./Python Utils", sim_folder)
 
              # Now use this function based on `con` value
-            if con == 'y':
+            if auto == 'y':
                 stream_process(["python", "VFP_Full_Process.py", dat_file, data["dalpha"], data["alphaN"], map_file, geo_file], sim_folder)
             else:
                 stream_process(["python", "VFP_Full_Process.py", dat_file, "1", "1", map_file, geo_file], sim_folder)
 
-            # try:
-            #     run.create_batch_file(map_file, geo_file, dat_file, dump_file, exc, con, dump, sim_folder)
-            #     emit('message', "Batch File Created Successfully. Attempting to Run the VFP.exe")
-
-            # except Exception as e:
-            #     emit('message', f'Error: {str(e)}')
-
-
-
-            # # bat_file_path = os.path.join(sim_folder, "run_vfp.bat")
-
-
-            # try:
-            #     # Execute the batch file and capture output in real-time
-            #     process = subprocess.Popen(bat_file_path, shell= True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=os.path.dirname(bat_file_path))
-
-            #     # Read and print output in real-time
-            #     while True:
-            #         output = process.stdout.readline()
-            #         if output == "" and process.poll() is not None:
-            #             break
-            #         if output:
-            #             print(output.strip())
-            #             emit('message', output.strip())
-
-            #     # Emit any error messages if necessary
-            #     for line in iter(process.stderr.readline, ''):
-            #         emit('message', line.strip())
-
-            #     # Wait for the process to finish
-            #     process.stdout.close()
-            #     process.stderr.close()
-            #     process.wait()
-
-                # Emit a final message once the batch file execution completes
-                # emit('message', 'Simulation completed successfully!')
-
-            # except Exception as e:
-            #     emit('message',  f'Error: {str(e)}')
 
         except Exception as e:
             print(f"Error processing simulation data: {e}")
