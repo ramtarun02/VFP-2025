@@ -1,8 +1,24 @@
-import React, { useState } from "react";
+import React, { useState,  useEffect } from "react";
 import "./ProWiM.css";
 import Prowim3Dmodel from "./Prowim3Dmodel";
 import { useNavigate } from "react-router-dom";
 
+
+function computeKS0D(CL0, CD0, A) {
+  if (!A || !CL0 || !CD0) return "";
+  const pi = Math.PI;
+  try {
+    return (
+      1 -
+      Math.sqrt(
+        ((2 * CL0) / (pi * A)) ** 2 +
+          (1 - (2 * CD0) / (pi * A)) ** 2
+      )
+    ).toFixed(5);
+  } catch {
+    return "";
+  }
+}
 
 function PropellerWingForm() {
   const navigate = useNavigate();
@@ -26,6 +42,18 @@ function PropellerWingForm() {
     propLocation: "5",
     D: "3"
   });
+
+   // Compute KS00 whenever A, CL0, or CD0 changes
+  useEffect(() => {
+    const A = parseFloat(formData.A);
+    const CL0 = parseFloat(formData.CL0[0]);
+    const CD0 = parseFloat(formData.CD0[0]);
+    const ks00 = computeKS0D(CL0, CD0, A);
+    setFormData((prev) => ({
+      ...prev,
+      KS00: [ks00]
+    }));
+  }, [formData.A, formData.CL0, formData.CD0]);
 
   const [result, setResult] = useState(null);
 
@@ -135,7 +163,7 @@ function PropellerWingForm() {
               />
             </div>
             <div>
-              <label>&Delta; CD_Prop</label>
+              <label>CD_Prop</label>
               <input 
                 type="text" 
                 value={result.CXD.toFixed(5)} 

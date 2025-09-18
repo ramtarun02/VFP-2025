@@ -1,266 +1,341 @@
-/* Reset and base styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
-  background-color: #f9fafb;
-  color: #111827;
-}
-
-body, button, input, select, table, h1, h2, h3, label {
-  font-family: 'Times New Roman', serif !important;
-}
-
-
 .app {
   min-height: 100vh;
+  background: #f9fafb;
+  font-family: 'Times New Roman', serif;
+  box-sizing: border-box;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
 }
 
-/* Header styles */
 .header {
-  background-color: white;
-  padding: 1rem;
-  display: flex; justify-content: space-between;
+  background: #fff;
+  padding: 1.2rem 2vw;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.08rem 0.2rem rgba(0,0,0,0.08);
+  font-family: 'Times New Roman', serif;
+  width: 100%;
+  max-width: 100vw;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .header-group {
   display: flex;
-  gap: 0.5rem;
+  gap: 1.2rem;
+  align-items: center;
 }
 
-.title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2563eb;
-}
-
-/* Button styles */
 .btn {
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.2rem;
   border-radius: 0.375rem;
-  font-size: 0.875rem;
+  font-size: 1.05rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  border: none;
+  transition: background 0.2s;
+  font-family: 'Times New Roman', serif;
 }
 
 .btn-primary {
-  background-color: #2563eb;
-  color: white;
-  border: none;
-}
-
-.btn-primary:hover {
-  background-color: #1d4ed8;
+  background: #2563eb;
+  color: #fff;
 }
 
 .btn-secondary {
-  background-color: #f3f4f6;
+  background: #f3f4f6;
   color: #374151;
-  border: 1px solid #d1d5db;
-}
-
-.btn-secondary:hover {
-  background-color: #e5e7eb;
+  border: 0.07rem solid #d1d5db;
 }
 
 .btn-danger {
-  background-color: #dc2626;
-  color: white;
-  border: none;
+  background: #dc2626;
+  color: #fff;
 }
 
-.btn-danger:hover {
-  background-color: #b91c1c;
+.content-row {
+  display: flex;
+  flex-direction: row;
+  gap: 2vw;
+  padding: 2vw;
+  min-height: 80vh;
+  align-items: flex-start;
+  font-family: 'Times New Roman', serif;
+  width: 100vw;
+  max-width: 100vw;
+  box-sizing: border-box;
+  margin: 0;
 }
 
-/* Main content layout */
 .main-content {
   display: flex;
-  gap: 1rem;
-  padding: 1rem;
-}
-
-/* Graph section */
-.graph-container {
-  flex: 1;
-}
-
-.graph-panel {
-  background-color: white;
-  height: 702px;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.graph-controls {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.tool-btn {
-  padding: 0.5rem;
-  border-radius: 9999px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.tool-btn:hover {
-  background-color: #f3f4f6;
-}
-
-.graph-canvas {
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  width: 90%;
-  height: 650px;
-  background-color: white;
-}
-
-/* Controls panel */
-.controls-panel {
-  width: 320px;
-}
-
-.controls-container {
-  background-color: white;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.controls-title {
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
-
-/* Parameters table */
-.parameters-table {
-  width: 100%;
-  margin-bottom: 1rem;
-  border-collapse: collapse;
-}
-
-.parameters-table th,
-.parameters-table td {
-  padding: 0.5rem;
-}
-
-.parameters-table th {
-  font-weight: 500;
-  text-align: left;
-}
-
-/* Input fields */
-.input-field {
-  width: 100%;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-}
-
-.input-field:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-}
-
-/* Computation controls */
-.computation-controls {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-/* Improve section */
-.improve-section {
-  border-top: 1px solid #e5e7eb;
-  padding-top: 1rem;
-}
-
-.improve-title {
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.improve-options {
-  display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  flex: 3;
+  gap: 1.5vw;
+  min-width: 0;
+  font-family: 'Times New Roman', serif;
+  width: 65vw;
+  max-width: 70vw;
+  box-sizing: border-box;
 }
 
-.radio-group {
-  display: flex;
-  align-items: center;
-}
-
-.radio-group label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.sections-input,
-.value-input {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.sections-input .input-field,
-.value-input .input-field {
-  width: 4rem;
-}
-
-.btn-improve {
+.graph-panel,
+.plot2d-panel {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.2vw;
+  box-shadow: 0 0.08rem 0.2rem rgba(0,0,0,0.08);
+  margin-bottom: 1vw;
+  font-family: 'Times New Roman', serif;
+  min-width: 0;
   width: 100%;
-  margin-top: 1rem;
+  box-sizing: border-box;
 }
 
 .dropdown-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 1vw;
+  font-size: 1.1rem;
   font-family: 'Times New Roman', serif;
-}
-
-.dropdown-container label {
-  font-size: 16px;
-  font-weight: bold;
 }
 
 #section-select {
+  font-size: 1.1rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 0.375rem;
+  border: 0.07rem solid #d1d5db;
+  background: #fff;
   font-family: 'Times New Roman', serif;
-  font-size: 16px;
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  background-color: white;
+}
+
+.plot2d-radio-group {
+  display: flex;
+  gap: 2vw;
+  margin-bottom: 1vw;
+  align-items: center;
+  font-family: 'Times New Roman', serif;
+  flex-wrap: wrap;
+}
+
+.plot2d-radio-group label {
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.7vw;
+  font-size: 1.1rem;
+  font-family: 'Times New Roman', serif;
 }
 
-#section-select:hover {
-  border-color: #007bff;
+.plot2d-radio-group input[type="radio"] {
+  accent-color: #2563eb;
 }
 
-#section-select:focus {
-  outline: none;
-  border-color: #0056b3;
-  box-shadow: 0 0 5px rgba(0, 91, 187, 0.5);
+.side-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 1vw;
+  align-items: flex-end;
+  font-family: 'Times New Roman', serif;
+  min-width: 260px;
+  max-width: 30vw;
+  box-sizing: border-box;
 }
 
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5vw;
+  width: 100%;
+  font-family: 'Times New Roman', serif;
+  align-items: center;
+}
+
+.specs-panel, .controls-panel {
+  background: linear-gradient(135deg, #f3f4f6 60%, #e0e7ff 100%);
+  border-radius: 1.2rem;
+  box-shadow: 0 0.15rem 0.4rem rgba(37,99,235,0.08), 0 0.05rem 0.2rem rgba(0,0,0,0.04);
+  padding: 2vw 1.5vw 1vw 1.5vw;
+  font-family: 'Times New Roman', serif;
+  border: 0.07rem solid #d1d5db;
+  transition: box-shadow 0.2s;
+  min-width: 300px;
+  max-width: 400px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+
+.specs-panel:hover, .controls-panel:hover {
+  box-shadow: 0 0.25rem 0.7rem rgba(37,99,235,0.18), 0 0.1rem 0.3rem rgba(0,0,0,0.08);
+}
+
+.specs-title, .controls-title {
+  font-weight: 700;
+  margin-bottom: 1.5vw;
+  font-size: 2rem;
+  color: #2563eb;
+  text-align: center;
+  font-family: 'Times New Roman', serif;
+  letter-spacing: 0.05em;
+}
+
+.specs-table, .parameters-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1vw;
+  font-family: 'Times New Roman', serif;
+  table-layout: fixed;
+}
+
+.specs-table td, .parameters-table td, .parameters-table th {
+  padding: 0.7vw 0.5vw;
+  font-size: 1.1rem;
+  font-family: 'Times New Roman', serif;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.parameters-table th.text-left,
+.parameters-table td:first-child {
+  width: 35%;
+}
+
+.parameters-table th:nth-child(2),
+.parameters-table td:nth-child(2) {
+  width: 32%;
+}
+
+.parameters-table th:nth-child(3),
+.parameters-table td:nth-child(3) {
+  width: 33%;
+}
+
+.input-field {
+  width: 100%;
+  min-width: 4em;
+  max-width: 100%;
+  padding: 0.3vw 0.7vw;
+  border: 0.07rem solid #d1d5db;
+  border-radius: 0.3rem;
+  font-size: 1.1rem;
+  background: #f3f4f6;
+  font-family: 'Times New Roman', serif;
+  box-sizing: border-box;
+}
+
+.computation-controls {
+  display: flex;
+  gap: 1vw;
+  margin-bottom: 1vw;
+  font-family: 'Times New Roman', serif;
+}
+
+/* Plotly canvas adjustments */
+.js-plotly-plot {
+  width: 100% !important;
+  min-height: 350px;
+  max-height: 450px;
+  background: transparent !important;
+  font-family: 'Times New Roman', serif;
+  box-sizing: border-box;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .content-row {
+    flex-direction: column;
+    gap: 2vw;
+    padding: 2vw;
+    min-height: unset;
+    max-width: 100vw;
+  }
+  .main-content, .side-content {
+    width: 100%;
+    min-width: unset;
+    gap: 2vw;
+    align-items: stretch;
+    max-width: 100vw;
+  }
+  .side-panel {
+    width: 100%;
+    min-width: unset;
+    max-width: unset;
+    margin-top: 2vw;
+    align-items: center;
+  }
+  .specs-panel, .controls-panel {
+    min-width: unset;
+    max-width: 400px;
+    margin: 0 auto 2vw auto;
+  }
+  .graph-panel, .plot2d-panel {
+    min-width: unset;
+    margin: 0 auto 2vw auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .header {
+    flex-direction: column;
+    padding: 1vw;
+    gap: 1vw;
+    max-width: 100vw;
+  }
+  .content-row {
+    flex-direction: column;
+    gap: 2vw;
+    padding: 1vw;
+    max-width: 100vw;
+  }
+  .main-content {
+    width: 100%;
+    min-width: unset;
+    gap: 2vw;
+    align-items: stretch;
+    max-width: 100vw;
+  }
+
+  .side-content {
+    max-width: 100vw;
+    min-width: unset;
+    align-items: center;
+  }
+  .side-panel {
+    width: 100%;
+    min-width: unset;
+    max-width: unset;
+    margin-top: 2vw;
+    align-items: center;
+  }
+  .specs-panel, .controls-panel {
+    min-width: unset;
+    max-width: 100vw;
+    margin: 0 auto 2vw auto;
+    padding: 4vw 2vw 2vw 2vw;
+  }
+  .graph-panel, .plot2d-panel {
+    min-width: unset;
+    margin: 0 auto 2vw auto;
+    padding: 4vw 2vw 2vw 2vw;
+  }
+  .specs-title, .controls-title {
+    font-size: 1.5rem;
+  }
+  .specs-table td, .parameters-table td, .parameters-table th {
+    padding: 1vw 2vw;
+    font-size: 1rem;
+  }
+  .input-field {
+    font-size: 1rem;
+    padding: 0.7vw 1vw;
+  }
+  .js-plotly-plot {
+    min-height: 200px;
+    max-height: 300px;
+  }
+}

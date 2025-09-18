@@ -336,22 +336,26 @@ def compute():
     ALFAWI = float(data["ALFAWI"][0])
     NELMNT = float(data["NELMNT"])
 
-    KS0D = compute_KS0D(CL0, CD0, A)
-    TS0D = compute_TS0D(CL0, CD0, A)
-    Hzp = 1 - 2.5 * abs(ZPD)
-    Kdc = -1.630 * cOverD ** 2 + 2.3727 * cOverD + 0.0038
-    Izp = (455.93 * ZPD ** 6 - 10.67 * ZPD**5 - 87.221 * ZPD**4 -
-           3.2742 * ZPD**3 + 0.2309 * ZPD**2 + 0.0418 * ZPD + 1.0027)
-
+    KS0D = round(compute_KS0D(CL0, CD0, A), 3)
+    print(KS0D)
+    TS0D = round(compute_TS0D(CL0, CD0, A), 3)
+    print(TS0D)
+    Hzp = round((1 - 2.5 * abs(ZPD)), 2)
+    Kdc = round((-1.630 * cOverD ** 2 + 2.3727 * cOverD + 0.0038), 2)
+    Izp = round((455.93 * ZPD ** 6 - 10.67 * ZPD**5 - 87.221 * ZPD**4 -
+           3.2742 * ZPD**3 + 0.2309 * ZPD**2 + 0.0418 * ZPD + 1.0027))
+    print(Hzp, Kdc, Izp)
     TS0Ap0_1d = -2 * Kdc * alpha0
     TS10 = Hzp * TS0Ap0_1d + 1.15 * Kdc * Izp * IW + (ALFAWI - IW)
     theta_s = TS0D + (CT + 0.3 * math.sin(math.pi * CT ** 1.36)) * (TS10 - TS0D)
     ks = KS0D + CT * (KS00 - KS0D)
     r = math.sqrt(1 - CT)
+    print(TS10, theta_s, ks, r)
 
     theta_rad = math.radians(theta_s)
     TS0D_rad = math.radians(TS0D)
     alpha_p = ALFAWI - IW
+    print(theta_rad, TS0D_rad, alpha_p)
 
     CZ = ((1 + r) * (1 - ks) * math.sin(theta_rad) +
           ((2 / N) * bOverD ** 2 - (1 + r)) * r ** 2 *
