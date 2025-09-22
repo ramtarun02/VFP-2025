@@ -33,7 +33,7 @@ function computeKS0D(CL0, CD0, A) {
       1 -
       Math.sqrt(
         ((2 * CL0) / (pi * A)) ** 2 +
-          (1 - (2 * CD0) / (pi * A)) ** 2
+        (1 - (2 * CD0) / (pi * A)) ** 2
       )
     ).toFixed(5);
   } catch {
@@ -91,22 +91,22 @@ function PropellerWingForm() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-const handleArrayChange = (name, value) => {
-  // Parse comma-separated AND space-separated values
-  // First replace commas with spaces, then split by spaces and filter
-  const values = value
-    .replace(/,/g, ' ')  // Replace all commas with spaces
-    .split(/\s+/)        // Split by one or more whitespace characters
-    .map(v => v.trim())  // Trim each value
-    .filter(v => v !== '') // Remove empty strings
-    .map(v => parseFloat(v)) // Convert to numbers
-    .filter(v => !isNaN(v)); // Remove invalid numbers
-  
-  setArrayInputs(prev => ({ ...prev, [name]: values }));
-  
-  // Update display value
-  setFormData(prev => ({ ...prev, [name]: value }));
-};
+  const handleArrayChange = (name, value) => {
+    // Parse comma-separated AND space-separated values
+    // First replace commas with spaces, then split by spaces and filter
+    const values = value
+      .replace(/,/g, ' ')  // Replace all commas with spaces
+      .split(/\s+/)        // Split by one or more whitespace characters
+      .map(v => v.trim())  // Trim each value
+      .filter(v => v !== '') // Remove empty strings
+      .map(v => parseFloat(v)) // Convert to numbers
+      .filter(v => !isNaN(v)); // Remove invalid numbers
+
+    setArrayInputs(prev => ({ ...prev, [name]: values }));
+
+    // Update display value
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
 
   const handleSubmit = async (e) => {
@@ -147,6 +147,73 @@ const handleArrayChange = (name, value) => {
   const handleBackToModel = () => {
     setShowPlots(false);
   };
+
+  const handleExportResults = (format = 'csv') => {
+    if (!result || !Array.isArray(result) || result.length === 0) {
+      alert("No results to export.");
+      return;
+    }
+
+    // Prepare data for export
+    const headers = ['Set', 'ALFAWI', 'CL0', 'CD0', 'KS00', 'CL_Prop', 'CD_Prop'];
+    const rows = result.map((res, index) => [
+      index + 1,
+      arrayInputs.ALFAWI[index]?.toFixed(2) || 'N/A',
+      arrayInputs.CL0[index]?.toFixed(3) || 'N/A',
+      arrayInputs.CD0[index]?.toFixed(4) || 'N/A',
+      arrayInputs.KS00[index]?.toFixed(4) || 'N/A',
+      res.CZD?.toFixed(5) || 'N/A',
+      res.CXD?.toFixed(5) || 'N/A'
+    ]);
+
+    let content = '';
+    let filename = '';
+    let mimeType = '';
+
+    if (format === 'csv') {
+      // CSV format
+      content = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+      filename = 'prowim_results.csv';
+      mimeType = 'text/csv';
+    } else if (format === 'txt') {
+      // Space-separated format
+      const columnWidths = headers.map((header, colIndex) =>
+        Math.max(
+          header.length,
+          ...rows.map(row => String(row[colIndex]).length)
+        )
+      );
+
+      const formatRow = (row) =>
+        row.map((cell, index) => String(cell).padEnd(columnWidths[index])).join(' ');
+
+      content = [formatRow(headers), ...rows.map(formatRow)].join('\n');
+      filename = 'prowim_results.txt';
+      mimeType = 'text/plain';
+    }
+
+    // Create and download file
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Add dropdown export function
+  const handleExportDropdown = (event) => {
+    const format = event.target.value;
+    if (format) {
+      handleExportResults(format);
+      // Reset dropdown
+      event.target.value = '';
+    }
+  };
+
 
   // Prepare chart data
   const prepareChartData = () => {
@@ -223,7 +290,7 @@ const handleArrayChange = (name, value) => {
           text: 'Angle of Attack (degrees)',
         },
         ticks: {
-          callback: function(value, index, values) {
+          callback: function (value, index, values) {
             return Number(this.getLabelForValue(value)).toFixed(3); // Format ticks to 1 decimal place
           }
         }
@@ -354,7 +421,7 @@ const handleArrayChange = (name, value) => {
             <option value="1">Single Flap</option>
             <option value="2">Double Flaps</option>
           </select>
-          
+
           <button type="submit">Compute</button>
           <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>Back to Main Module</button>
         </form>
@@ -395,6 +462,12 @@ const handleArrayChange = (name, value) => {
               <button type="button" onClick={handlePlotResults} className="btn btn-success">
                 Plot CL vs Alpha & CD vs Alpha
               </button>
+
+              <select onChange={handleExportDropdown} className="btn btn-info export-dropdown">
+                <option value="">Export Results</option>
+                <option value="csv">Export as CSV</option>
+                <option value="txt">Export as TXT</option>
+              </select>
             </div>
           </div>
         )}
