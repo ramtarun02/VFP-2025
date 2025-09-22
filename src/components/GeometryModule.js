@@ -77,7 +77,6 @@ function GeometryModule() {
     }));
   };
 
-  // Compute desired and update new data
   const computeDesired = async () => {
     if (selectedSection === null || selectedSection === undefined) {
       alert("Please select a section first");
@@ -94,21 +93,23 @@ function GeometryModule() {
         body: JSON.stringify({
           sectionIndex: selectedSection,
           parameters: modifiedParameters,
-          geoData: geoData,
-          plotData: plotData
+          geoData: newgeoData || geoData, // Use updatedGeoData if available
+          plotData: newplotData || plotData // Use updatedPlotData if available
         }),
       });
       const { updatedGeoData, updatedPlotData } = await response.json();
       if (updatedPlotData) {
         setnewGeoData(updatedGeoData);
         setnewPlotData(updatedPlotData);
-        setModifiedParameters({});
+        // Do NOT reset modifiedParameters here
         updateParameters(selectedSection);
+        console.log('Updated Geo Data:', updatedGeoData);
       }
     } catch (error) {
       console.error('Error computing desired parameters:', error);
     }
-  };
+  }
+
 
   // 3D plot traces
   const plot3DTrace = () => {
@@ -137,24 +138,72 @@ function GeometryModule() {
   // 2D plot traces
   const plot2DTrace = () => {
     if (!plotData) return [];
+    // if (selected2DPlot === "twist" && geoData) {
+    //   return [{
+    //     x: geoData.map((_, i) => i + 1),
+    //     y: geoData.map(section => section.TWIST),
+    //     type: 'scatter',
+    //     mode: 'lines+markers',
+    //     name: 'Twist'
+    //   }];
+    // }
+
     if (selected2DPlot === "twist" && geoData) {
-      return [{
-        x: geoData.map((_, i) => i + 1),
-        y: geoData.map(section => section.TWIST),
-        type: 'scatter',
-        mode: 'lines+markers',
-        name: 'Twist Distribution'
-      }];
+      const traces = [
+        {
+          x: geoData.map((_, i) => i + 1),
+          y: geoData.map(section => section.TWIST),
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: 'Original Twist'
+        }
+      ];
+      if (newgeoData) {
+        traces.push({
+          x: newgeoData.map((_, i) => i + 1),
+          y: newgeoData.map(section => section.TWIST),
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: 'Modified Twist'
+        });
+      }     
+      return traces;
     }
+
     if (selected2DPlot === "dihedral" && geoData) {
-      return [{
-        x: geoData.map((_, i) => i + 1),
-        y: geoData.map(section => section.HSECT),
-        type: 'scatter',
-        mode: 'lines+markers',
-        name: 'Dihedral Distribution'
-      }];
+      const traces = [
+        {
+          x: geoData.map((_, i) => i + 1),
+          y: geoData.map(section => section.HSECT),
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: 'Original Dihedral'
+        }
+      ];
+      if (newgeoData) {
+        traces.push({
+          x: newgeoData.map((_, i) => i + 1),
+          y: newgeoData.map(section => section.HSECT),
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: 'Modified Dihedral'
+        });
+      }
+      return traces;
     }
+
+
+
+
+    // if (selected2DPlot === "dihedral" && geoData) {
+    //   return [{
+    //     x: geoData.map((_, i) => i + 1),
+    //     y: geoData.map(section => section.HSECT),
+    //     type: 'scatter',
+    //     mode: 'lines+markers',
+    //     name: 'Dihedral Distribution'
+    //   }];
+    // }
     if (selected2DPlot === "section" && selectedSection >= 0) {
       const sectionData = plotData[selectedSection] || {};
       const traces = [
@@ -244,6 +293,7 @@ function GeometryModule() {
       return traces;
     }
     return [];
+
   };
 
   return (

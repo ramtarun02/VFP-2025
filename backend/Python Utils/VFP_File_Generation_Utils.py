@@ -111,7 +111,7 @@ def iterate_AoA_modifications(original_file, mach_str, initial_aoa_str, output_b
 
         sign = "-" if new_aoa < 0 else "+"
         aoa_for_filename = f"{abs(new_aoa):.2f}".replace('.', 'p')
-        output_filename = f"{output_base_name}{sign}{aoa_for_filename}.dat"
+        output_filename = f"{output_base_name}{aoa_for_filename}.dat"
         output_file_path = os.path.join(flow_dir, output_filename)
 
         # Only include all levels if aoa == 0, else only level3
@@ -152,33 +152,42 @@ def iterate_AoA_modifications(original_file, mach_str, initial_aoa_str, output_b
             f.writelines(output_lines)
 
         # Save levels/fuse as JSON for each AoA
-        json_filename = f"{output_base_name}{sign}{aoa_for_filename}.json"
+        json_filename = f"{output_base_name}{aoa_for_filename}.json"
         json_file_path = os.path.join(flow_dir, json_filename)
         with open(json_file_path, 'w') as jf:
             json.dump(data_json, jf, indent=4)
 
-            
+
+
 def run_aoa_generation(flow_file, d, n):
     original_file = flow_file.strip()
-    match = re.search(r"M(\d{3})[^-+]*([-+]?\d+p\d+)\.dat$", original_file)
+    # Accept AoA with or without sign, e.g. M085Re19p8ma1p00.dat or M085Re19p8ma-1p00.dat
+    match = re.search(r"M(\d{3})[^-+]*([-+]?\d*p\d+|\d*p\d+)\.dat$", original_file)
     if not match:
-        print("Filename format not recognized. Expected format like 'M085Re19p8ma-1p00.dat'")
+        print("Filename format not recognized. Expected format like 'M085Re19p8ma-1p00.dat' or 'M085Re19p8ma1p00.dat'")
         return
 
     mach_str = f"{int(match.group(1)) / 100:.4f}"
-    aoa_str = match.group(2).replace('p', '.')
-    aoa_str = f"{float(aoa_str):.4f}"
-    if not aoa_str.startswith('-') and not aoa_str.startswith('+'):
-        aoa_str = f"-{aoa_str}"
+    aoa_raw = match.group(2)
+    # If AoA does not start with sign, assume positive
+    if aoa_raw.startswith('-') or aoa_raw.startswith('+'):
+        aoa_str = aoa_raw.replace('p', '.')
+    else:
+        aoa_str = f"{float(aoa_raw.replace('p', '.')):.4f}"
+
+    # Always format AoA with sign for output_base_name logic
+    if not str(aoa_str).startswith('-') and not str(aoa_str).startswith('+'):
+        aoa_str = f"+{aoa_str}"
 
     output_base_name = os.path.splitext(original_file)[0]
-    output_base_name = re.sub(r"[-+]\d+p\d+$", "", output_base_name)
+    output_base_name = re.sub(r"[-+]?\d*p\d+$", "", output_base_name)
 
     try:
         iterate_AoA_modifications(original_file, mach_str, aoa_str, output_base_name, d, n)
     except FileNotFoundError:
         print(f"File '{original_file}' not found.")
 
+            
 def copy_generated_files_to_main_dir():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     flow_dir = os.path.join(script_dir, "Flow_Conditions")

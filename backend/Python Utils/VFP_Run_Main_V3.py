@@ -10,7 +10,7 @@ if len(sys.argv) < 2:
 
 def extract_aoa_from_dat_filename(filepath):
     filename = os.path.basename(filepath)
-    match = re.search(r"M\d+Re\d+p\d+ma([-+]\d+p\d+)\.dat$", filename)
+    match = re.search(r"M\d+Re\d+p\d+ma([-+]?\d+p\d+)\.dat$", filename)
     if match:
         aoa_str = match.group(1).replace('p', '.')
         try:
