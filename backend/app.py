@@ -320,7 +320,6 @@ def compute_TS0D(CL0, CD0, A):
     val = np.degrees(np.arctan((2 * CL0 / (math.pi * A)) / (1 - (2 * CD0 / (math.pi * A)))))
     return np.round(val, 3)
 
-# ...existing code...
 
 @app.route("/prowim-compute", methods=["POST"])
 def compute():
@@ -382,7 +381,7 @@ def compute():
 
         CXwf = CX - CT * np.cos(np.radians(alpha_p))
         CXDwf = CXwf * NSPSW / (1 - CT)
-        CXD = -(CX * NSPSW / (1 - CT))
+        CXD = (CX * NSPSW / (1 - CT))
 
         # Prepare results as list of dicts - ensure all values are converted to Python types
         results = []

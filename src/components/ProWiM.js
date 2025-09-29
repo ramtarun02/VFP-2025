@@ -436,9 +436,9 @@ function PropellerWingForm() {
                   <tr>
                     <th>Set</th>
                     <th>ALFAWI</th>
+                    <th>KS00</th>
                     <th>CL0</th>
                     <th>CD0</th>
-                    <th>KS00</th>
                     <th>CL_Prop</th>
                     <th>CD_Prop</th>
                   </tr>
@@ -448,9 +448,9 @@ function PropellerWingForm() {
                     <tr key={index}>
                       <td>{index + 1}</td>
                       <td>{arrayInputs.ALFAWI[index]?.toFixed(2) || 'N/A'}</td>
+                      <td>{arrayInputs.KS00[index]?.toFixed(4) || 'N/A'}</td>
                       <td>{arrayInputs.CL0[index]?.toFixed(3) || 'N/A'}</td>
                       <td>{arrayInputs.CD0[index]?.toFixed(4) || 'N/A'}</td>
-                      <td>{arrayInputs.KS00[index]?.toFixed(4) || 'N/A'}</td>
                       <td>{res.CZD?.toFixed(5) || 'N/A'}</td>
                       <td>{res.CXD?.toFixed(5) || 'N/A'}</td>
                     </tr>
