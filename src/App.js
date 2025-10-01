@@ -7,18 +7,20 @@ import Solver from "./components/Solver"
 import PostProcessing from "./components/PostProcessing";
 import ProWiM from "./components/ProWiM"
 import { FormDataProvider } from "./components/FormDataContext";
+import SimulationRun from "./components/SimulationRun";
+
 
 function App() {
   return (
-    <FormDataProvider> 
+    <FormDataProvider>
       <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/geometry" element={<GeometryModule />} />
-          <Route path="/run-solver" element={<RunSolver />} />
-          <Route path="/results" element={<Solver />} />
-          <Route path="/post-processing" element={<PostProcessing />} />
-          <Route path="/propeller-wing-form" element={<ProWiM />} />
-
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/geometry" element={<GeometryModule />} />
+        <Route path="/run-solver" element={<RunSolver />} />
+        <Route path="/results" element={<Solver />} />
+        <Route path="/post-processing" element={<PostProcessing />} />
+        <Route path="/propeller-wing-form" element={<ProWiM />} />
+        <Route path="/simulation-run" element={<SimulationRun />} />
       </Routes>
     </FormDataProvider>
   );

@@ -5,10 +5,9 @@ import "./GeometryModule.css";
 import { useNavigate } from "react-router-dom";
 
 function GeometryModule() {
-  const [geoData, setGeoData] = useState(null);
-  const [newgeoData, setnewGeoData] = useState(null);
-  const [plotData, setPlotData] = useState(null);
-  const [newplotData, setnewPlotData] = useState(null);
+  const [geoFiles, setGeoFiles] = useState([]); // Array to store multiple GEO files
+  const [selectedGeoFile, setSelectedGeoFile] = useState(null); // Currently selected file for 3D view
+  const [visible2DFiles, setVisible2DFiles] = useState([]); // Array of file IDs visible in 2D plots
   const [sections, setSections] = useState([]);
   const [selectedSection, setSelectedSection] = useState(-1);
   const [parameters, setParameters] = useState({});
@@ -16,13 +15,30 @@ function GeometryModule() {
   const [selected2DPlot, setSelected2DPlot] = useState("");
   const navigate = useNavigate();
 
-  // File upload handler
+  // Color palette for different GEO files
+  const colorPalette = [
+    { primary: 'red', secondary: 'blue' },
+    { primary: 'green', secondary: 'orange' },
+    { primary: 'purple', secondary: 'brown' },
+    { primary: 'pink', secondary: 'gray' },
+    { primary: 'cyan', secondary: 'yellow' },
+    { primary: 'magenta', secondary: 'olive' }
+  ];
+
+  // Helper function to remove file extension
+  const removeFileExtension = (filename) => {
+    return filename.replace(/\.[^/.]+$/, "");
+  };
+
+  // File upload handler - supports multiple files
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
 
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(file => {
+      formData.append('files', file);
+    });
 
     try {
       const response = await fetch('http://127.0.1:5000/import-geo', {
@@ -30,17 +46,72 @@ function GeometryModule() {
         body: formData,
       });
 
-      const { geoData, plotData } = await response.json();
+      const data = await response.json();
 
-      if (plotData) {
-        setGeoData(geoData);
-        setPlotData(plotData);
-        setSections(["3D Wing", ...geoData.map((_, i) => `Section ${i + 1}`)]);
-        setSelectedSection(-1);
+      if (data.results) {
+        const newGeoFiles = [];
+
+        data.results.forEach((result, index) => {
+          if (!result.error && result.plotData) {
+            const newGeoFile = {
+              id: Date.now() + index, // Unique ID
+              name: removeFileExtension(result.filename), // Remove extension from display name
+              fullName: result.filename, // Keep full filename for reference
+              originalGeoData: result.geoData,
+              modifiedGeoData: null,
+              originalPlotData: result.plotData,
+              modifiedPlotData: null,
+              color: colorPalette[(geoFiles.length + index) % colorPalette.length],
+              selectedSection: -1 // Track selected section per file
+            };
+            newGeoFiles.push(newGeoFile);
+          } else {
+            console.error(`Error processing ${result.filename}:`, result.error);
+          }
+        });
+
+        setGeoFiles(prev => [...prev, ...newGeoFiles]);
+
+        // Set first new file as selected for 3D view if no file was previously selected
+        if (!selectedGeoFile && newGeoFiles.length > 0) {
+          const firstFile = newGeoFiles[0];
+          setSelectedGeoFile(firstFile);
+          setSections(["3D Wing", ...firstFile.originalGeoData.map((_, i) => `Section ${i + 1}`)]);
+          setSelectedSection(-1);
+        }
+
+        // Add all new files to visible 2D files by default
+        const newFileIds = newGeoFiles.map(file => file.id);
+        setVisible2DFiles(prev => [...prev, ...newFileIds]);
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('Error uploading files:', error);
     }
+
+    // Reset file input
+    event.target.value = '';
+  };
+
+  const handleGeoFileSelection = (event) => {
+    const fileId = parseInt(event.target.value);
+    const selectedFile = geoFiles.find(file => file.id === fileId);
+    setSelectedGeoFile(selectedFile);
+
+    if (selectedFile) {
+      const geoData = selectedFile.modifiedGeoData || selectedFile.originalGeoData;
+      setSections(["3D Wing", ...geoData.map((_, i) => `Section ${i + 1}`)]);
+      setSelectedSection(selectedFile.selectedSection);
+      updateParameters(selectedFile.selectedSection);
+      setModifiedParameters({}); // Clear modified parameters when switching files
+    }
+  };
+
+  const handle2DVisibilityToggle = (fileId) => {
+    setVisible2DFiles(prev =>
+      prev.includes(fileId)
+        ? prev.filter(id => id !== fileId)
+        : [...prev, fileId]
+    );
   };
 
   const handleSectionChange = (event) => {
@@ -48,15 +119,33 @@ function GeometryModule() {
     setSelectedSection(sectionIndex);
     updateParameters(sectionIndex);
     setSelected2DPlot("");
+    setModifiedParameters({}); // Clear modified parameters when switching sections
+
+    // Update the selected section for the current file
+    if (selectedGeoFile) {
+      setGeoFiles(prev => prev.map(file =>
+        file.id === selectedGeoFile.id
+          ? { ...file, selectedSection: sectionIndex }
+          : file
+      ));
+      setSelectedGeoFile(prev => ({ ...prev, selectedSection: sectionIndex }));
+    }
   };
 
   const updateParameters = (sectionIndex) => {
-    if (sectionIndex === -1) {
+    if (sectionIndex === -1 || !selectedGeoFile) {
       setParameters({
         Twist: '',
-        Dihedral: '', YSECT: '', XLE: '', XTE: '', Chord: '',
+        Dihedral: '',
+        YSECT: '',
+        XLE: '',
+        XTE: '',
+        Chord: '',
       });
+      return;
     }
+
+    const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
     if (geoData && geoData[sectionIndex]) {
       setParameters({
         Twist: geoData[sectionIndex].TWIST,
@@ -78,14 +167,15 @@ function GeometryModule() {
   };
 
   const computeDesired = async () => {
-    if (selectedSection === null || selectedSection === undefined) {
-      alert("Please select a section first");
+    if (!selectedGeoFile || selectedSection === null || selectedSection === undefined) {
+      alert("Please select a file and section first");
       return;
     }
     if (Object.keys(modifiedParameters).length === 0) {
       alert("Please modify at least one parameter before computing");
       return;
     }
+
     try {
       const response = await fetch('http://127.0.1:5000/compute_desired', {
         method: 'POST',
@@ -93,28 +183,54 @@ function GeometryModule() {
         body: JSON.stringify({
           sectionIndex: selectedSection,
           parameters: modifiedParameters,
-          geoData: newgeoData || geoData, // Use updatedGeoData if available
-          plotData: newplotData || plotData // Use updatedPlotData if available
+          geoData: selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData,
+          plotData: selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData
         }),
       });
+
       const { updatedGeoData, updatedPlotData } = await response.json();
+
       if (updatedPlotData) {
-        setnewGeoData(updatedGeoData);
-        setnewPlotData(updatedPlotData);
-        // Do NOT reset modifiedParameters here
+        // Update the selected file with modified data
+        setGeoFiles(prev => prev.map(file =>
+          file.id === selectedGeoFile.id
+            ? { ...file, modifiedGeoData: updatedGeoData, modifiedPlotData: updatedPlotData }
+            : file
+        ));
+
+        // Update selectedGeoFile reference
+        setSelectedGeoFile(prev => ({
+          ...prev,
+          modifiedGeoData: updatedGeoData,
+          modifiedPlotData: updatedPlotData
+        }));
+
+        // Update parameters with new baseline values and clear modified parameters
         updateParameters(selectedSection);
+        setModifiedParameters({}); // Clear modified parameters after successful computation
+
         console.log('Updated Geo Data:', updatedGeoData);
       }
     } catch (error) {
       console.error('Error computing desired parameters:', error);
     }
-  }
+  };
 
+  // Get current selection info for header
+  const getSelectionInfo = () => {
+    if (!selectedGeoFile || selectedSection === -1) {
+      return "No file or section selected";
+    }
+    return `${selectedGeoFile.name} - Section ${selectedSection + 1}`;
+  };
 
-  // 3D plot traces
+  // 3D plot traces (only for selected file)
   const plot3DTrace = () => {
-    if (!plotData) return [];
-    // Always show all sections in 3D
+    if (!selectedGeoFile) return [];
+
+    const plotData = selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData;
+    const color = selectedGeoFile.color;
+
     return plotData.flatMap((sectionData, index) => [
       {
         x: sectionData.xus,
@@ -122,7 +238,7 @@ function GeometryModule() {
         z: sectionData.zus,
         type: 'scatter3d',
         mode: 'lines',
-        line: { 'color': 'red', 'width': 6 }
+        line: { 'color': color.primary, 'width': 6 }
       },
       {
         x: sectionData.xls,
@@ -130,170 +246,137 @@ function GeometryModule() {
         z: sectionData.zls,
         type: 'scatter3d',
         mode: 'lines',
-        line: { 'color': 'blue', 'width': 6 }
+        line: { 'color': color.secondary, 'width': 6 }
       }
     ]);
   };
 
-  // 2D plot traces
+  // 2D plot traces (for all visible files)
   const plot2DTrace = () => {
-    if (!plotData) return [];
-    // if (selected2DPlot === "twist" && geoData) {
-    //   return [{
-    //     x: geoData.map((_, i) => i + 1),
-    //     y: geoData.map(section => section.TWIST),
-    //     type: 'scatter',
-    //     mode: 'lines+markers',
-    //     name: 'Twist'
-    //   }];
-    // }
+    const visibleFiles = geoFiles.filter(file => visible2DFiles.includes(file.id));
+    if (visibleFiles.length === 0) return [];
 
-    if (selected2DPlot === "twist" && geoData) {
-      const traces = [
-        {
+    if (selected2DPlot === "twist") {
+      return visibleFiles.flatMap(file => {
+        const geoData = file.originalGeoData;
+        const modifiedGeoData = file.modifiedGeoData;
+        const color = file.color;
+
+        const traces = [{
           x: geoData.map((_, i) => i + 1),
           y: geoData.map(section => section.TWIST),
           type: 'scatter',
           mode: 'lines+markers',
-          name: 'Original Twist'
+          name: `${file.name} - Original Twist`,
+          line: { color: color.primary }
+        }];
+
+        if (modifiedGeoData) {
+          traces.push({
+            x: modifiedGeoData.map((_, i) => i + 1),
+            y: modifiedGeoData.map(section => section.TWIST),
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: `${file.name} - Modified Twist`,
+            line: { color: color.primary, dash: 'dash' }
+          });
         }
-      ];
-      if (newgeoData) {
-        traces.push({
-          x: newgeoData.map((_, i) => i + 1),
-          y: newgeoData.map(section => section.TWIST),
-          type: 'scatter',
-          mode: 'lines+markers',
-          name: 'Modified Twist'
-        });
-      }     
-      return traces;
+
+        return traces;
+      });
     }
 
-    if (selected2DPlot === "dihedral" && geoData) {
-      const traces = [
-        {
+    if (selected2DPlot === "dihedral") {
+      return visibleFiles.flatMap(file => {
+        const geoData = file.originalGeoData;
+        const modifiedGeoData = file.modifiedGeoData;
+        const color = file.color;
+
+        const traces = [{
           x: geoData.map((_, i) => i + 1),
           y: geoData.map(section => section.HSECT),
           type: 'scatter',
           mode: 'lines+markers',
-          name: 'Original Dihedral'
+          name: `${file.name} - Original Dihedral`,
+          line: { color: color.secondary }
+        }];
+
+        if (modifiedGeoData) {
+          traces.push({
+            x: modifiedGeoData.map((_, i) => i + 1),
+            y: modifiedGeoData.map(section => section.HSECT),
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: `${file.name} - Modified Dihedral`,
+            line: { color: color.secondary, dash: 'dash' }
+          });
         }
-      ];
-      if (newgeoData) {
-        traces.push({
-          x: newgeoData.map((_, i) => i + 1),
-          y: newgeoData.map(section => section.HSECT),
-          type: 'scatter',
-          mode: 'lines+markers',
-          name: 'Modified Dihedral'
-        });
-      }
-      return traces;
+
+        return traces;
+      });
     }
 
+    if (selected2DPlot === "section") {
+      return visibleFiles.flatMap(file => {
+        const sectionIndex = file.selectedSection;
 
+        // Skip if no valid section selected for this file
+        if (sectionIndex < 0) return [];
 
+        const plotData = file.originalPlotData;
+        const modifiedPlotData = file.modifiedPlotData;
+        const color = file.color;
 
-    // if (selected2DPlot === "dihedral" && geoData) {
-    //   return [{
-    //     x: geoData.map((_, i) => i + 1),
-    //     y: geoData.map(section => section.HSECT),
-    //     type: 'scatter',
-    //     mode: 'lines+markers',
-    //     name: 'Dihedral Distribution'
-    //   }];
-    // }
-    if (selected2DPlot === "section" && selectedSection >= 0) {
-      const sectionData = plotData[selectedSection] || {};
-      const traces = [
-        {
-          x: sectionData.xus,
-          y: sectionData.zus,
-          type: 'scatter',
-          mode: 'lines',
-          name: `Upper Surface - Section ${selectedSection + 1}`,
-          line: { 'color': 'red', 'width': 3 }
-        },
-        {
-          x: sectionData.xls,
-          y: sectionData.zls,
-          type: 'scatter',
-          mode: 'lines',
-          name: `Lower Surface - Section ${selectedSection + 1}`,
-          line: { 'color': 'blue', 'width': 3 }
-        }
-      ];
-      if (newplotData) {
-        const newsectionData = newplotData[selectedSection] || {};
-        if (newsectionData.xus_n && newsectionData.zus_n) {
-          traces.push(
-            {
-              x: newsectionData.xus_n,
-              y: newsectionData.zus_n,
-              type: 'scatter',
-              mode: 'lines',
-              name: `Modified Upper - Section ${selectedSection + 1}`,
-              line: { 'color': 'red', 'width': 3, 'dash': 'dash' }
-            },
-            {
-              x: newsectionData.xls_n,
-              y: newsectionData.zls_n,
-              type: 'scatter',
-              mode: 'lines',
-              name: `Modified Lower - Section ${selectedSection + 1}`,
-              line: { 'color': 'blue', 'width': 3, 'dash': 'dash' }
-            }
-          );
-        }
-      }
-      return traces;
-    }
-    if (!selected2DPlot && newplotData && selectedSection >= 0) {
-      const sectionData = plotData[selectedSection] || {};
-      const newsectionData = newplotData[selectedSection] || {};
-      const traces = [
-        {
-          x: sectionData.xus,
-          y: sectionData.zus,
-          type: 'scatter',
-          mode: 'lines',
-          name: `Original Upper - Section ${selectedSection + 1}`,
-          line: { 'color': 'red', 'width': 3 }
-        },
-        {
-          x: sectionData.xls,
-          y: sectionData.zls,
-          type: 'scatter',
-          mode: 'lines',
-          name: `Original Lower - Section ${selectedSection + 1}`,
-          line: { 'color': 'blue', 'width': 3 }
-        }
-      ];
-      if (newsectionData.xus_n && newsectionData.zus_n) {
-        traces.push(
+        if (!plotData[sectionIndex]) return [];
+
+        const sectionData = plotData[sectionIndex];
+        const traces = [
           {
-            x: newsectionData.xus_n,
-            y: newsectionData.zus_n,
+            x: sectionData.xus,
+            y: sectionData.zus,
             type: 'scatter',
             mode: 'lines',
-            name: `Modified Upper - Section ${selectedSection + 1}`,
-            line: { 'color': 'red', 'width': 3, 'dash': 'dash' }
+            name: `${file.name} - Section ${sectionIndex + 1} - Upper Surface`,
+            line: { 'color': color.primary, 'width': 3 }
           },
           {
-            x: newsectionData.xls_n,
-            y: newsectionData.zls_n,
+            x: sectionData.xls,
+            y: sectionData.zls,
             type: 'scatter',
             mode: 'lines',
-            name: `Modified Lower - Section ${selectedSection + 1}`,
-            line: { 'color': 'blue', 'width': 3, 'dash': 'dash' }
+            name: `${file.name} - Section ${sectionIndex + 1} - Lower Surface`,
+            line: { 'color': color.secondary, 'width': 3 }
           }
-        );
-      }
-      return traces;
-    }
-    return [];
+        ];
 
+        if (modifiedPlotData && modifiedPlotData[sectionIndex]) {
+          const newsectionData = modifiedPlotData[sectionIndex];
+          if (newsectionData.xus_n && newsectionData.zus_n) {
+            traces.push(
+              {
+                x: newsectionData.xus_n,
+                y: newsectionData.zus_n,
+                type: 'scatter',
+                mode: 'lines',
+                name: `${file.name} - Section ${sectionIndex + 1} - Modified Upper`,
+                line: { 'color': color.primary, 'width': 3, 'dash': 'dash' }
+              },
+              {
+                x: newsectionData.xls_n,
+                y: newsectionData.zls_n,
+                type: 'scatter',
+                mode: 'lines',
+                name: `${file.name} - Section ${sectionIndex + 1} - Modified Lower`,
+                line: { 'color': color.secondary, 'width': 3, 'dash': 'dash' }
+              }
+            );
+          }
+        }
+        return traces;
+      });
+    }
+
+    return [];
   };
 
   return (
@@ -309,10 +392,11 @@ function GeometryModule() {
               onChange={handleFileUpload}
               style={{ display: 'none' }}
               id="fileInput"
+              multiple
             />
-            <button onClick={() => document.getElementById('fileInput').click()} style={{ border: 'none' }}>
-              Upload GEO File
-            </button>
+            <label onClick={() => document.getElementById('fileInput').click()}>
+              Upload GEO Files
+            </label>
           </div>
         </div>
         <div className="header-group">
@@ -326,6 +410,25 @@ function GeometryModule() {
         {/* Main Content: vertical stack */}
         <div className="main-content">
           <div className="graph-panel">
+            {/* GEO File Selection for 3D Plot */}
+            {geoFiles.length > 0 && (
+              <div className="dropdown-container">
+                <label htmlFor="geo-file-select">3D Plot File: </label>
+                <select
+                  id="geo-file-select"
+                  onChange={handleGeoFileSelection}
+                  value={selectedGeoFile?.id || ''}
+                >
+                  {geoFiles.map((file) => (
+                    <option key={file.id} value={file.id}>
+                      {file.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Section Selection */}
             {sections.length > 0 && (
               <div className="dropdown-container">
                 <label htmlFor="section-select">Section: </label>
@@ -340,14 +443,39 @@ function GeometryModule() {
               </div>
             )}
           </div>
-          {/* Plot3D is rendered outside any container */}
-          {plotData && (
+
+          {/* 3D Plot */}
+          {selectedGeoFile && (
             <Plot3D
               plotData={plot3DTrace()}
               selectedSection={selectedSection}
             />
           )}
+
           <div className="plot2d-panel">
+            {/* 2D File Visibility Controls */}
+            {geoFiles.length > 0 && (
+              <div className="file-visibility-container">
+                <label>2D Plot Files: </label>
+                <div className="checkbox-group">
+                  {geoFiles.map(file => (
+                    <label key={file.id} className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={visible2DFiles.includes(file.id)}
+                        onChange={() => handle2DVisibilityToggle(file.id)}
+                      />
+                      <span style={{ color: file.color.primary }}>
+                        {file.name}
+                        {file.selectedSection >= 0 && ` (Section ${file.selectedSection + 1})`}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2D Plot Type Selection */}
             <div className="plot2d-radio-group">
               <label>
                 <input
@@ -356,7 +484,7 @@ function GeometryModule() {
                   value="section"
                   checked={selected2DPlot === "section"}
                   onChange={() => setSelected2DPlot("section")}
-                  disabled={selectedSection < 0}
+                  disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
                 />
                 Section 2D Plot
               </label>
@@ -382,8 +510,9 @@ function GeometryModule() {
               </label>
             </div>
           </div>
-          {/* Plot2D is rendered outside any container */}
-          {(plotData || newplotData) && (
+
+          {/* 2D Plot */}
+          {geoFiles.length > 0 && visible2DFiles.length > 0 && (
             <Plot2D
               plotData={plot2DTrace()}
               selectedSection={selectedSection}
@@ -426,6 +555,10 @@ function GeometryModule() {
             <div className="controls-panel">
               <div className="controls-container">
                 <h2 className="controls-title">Controls</h2>
+                {/* Selection Info Header */}
+                <div className="selection-info">
+                  <h3 className="selection-header">{getSelectionInfo()}</h3>
+                </div>
                 <table className="parameters-table">
                   <thead>
                     <tr>

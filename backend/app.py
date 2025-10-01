@@ -264,47 +264,56 @@ def handle_disconnect():
 
  
 
-
-
-
-
 @app.route('/import-geo', methods=['POST'])
 def import_geo():
-    # Check if a file was uploaded
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
+    # Check if files were uploaded
+    if 'files' not in request.files:
+        return jsonify({'error': 'No files uploaded'}), 400
 
-    file = request.files['file']
+    files = request.files.getlist('files')
+    
+    if not files or all(file.filename == '' for file in files):
+        return jsonify({'error': 'No files selected'}), 400
 
-    # # Check if the file has a valid name and extension
-    # if file.filename == '':
-    #     return jsonify({'error': 'No selected file'}), 400
-    # if not allowed_file(file.filename):
-    #     return jsonify({'error': 'Invalid file type. Only .GEO files are allowed.'}), 400
+    results = []
+    
+    for file in files:
+        if file.filename == '':
+            continue
+            
+        # Save the file to the upload folder
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
 
-    # Save the file to the upload folder
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
+        print(f"Processing file: {file_path}")
 
-    print(file_path)
+        try:
+            # Pass the file to the readGEO function
+            geo_data = rG.readGEO(file_path)
+            import copy
+            points = rG.airfoils(copy.deepcopy(geo_data))
+            
+            # Add file info to results
+            results.append({
+                'filename': filename,
+                'geoData': geo_data,
+                'plotData': points
+            })
 
-    try:
-        # Pass the file to the readGEO function
-        geo_data = rG.readGEO(file_path)
-        import copy
-        points = rG.airfoils(copy.deepcopy(geo_data))
-        # Return the JSON response
-        return jsonify({'geoData': geo_data, 'plotData': points}), 200
+        except Exception as e:
+            results.append({
+                'filename': filename,
+                'error': f'Error processing file: {str(e)}'
+            })
 
-    except Exception as e:
-        return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+        finally:
+            # Clean up: Delete the uploaded file after processing
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
-    finally:
-        # Clean up: Delete the uploaded file after processing
-        if os.path.exists(file_path):
-            os.remove(file_path)
-
+    # Return the JSON response with all results
+    return jsonify({'results': results}), 200
 
 
 
@@ -381,7 +390,7 @@ def compute():
 
         CXwf = CX - CT * np.cos(np.radians(alpha_p))
         CXDwf = CXwf * NSPSW / (1 - CT)
-        CXD = (CX * NSPSW / (1 - CT))
+        CXD = -(CX * NSPSW / (1 - CT))
 
         # Prepare results as list of dicts - ensure all values are converted to Python types
         results = []
@@ -417,7 +426,6 @@ def compute():
         return jsonify({"error": str(e)}), 500
 
 
-
 @app.route('/compute_desired', methods=['POST'])
 def compute_desired():
     data = request.get_json()
@@ -426,134 +434,124 @@ def compute_desired():
     geo_data = data['geoData']
     plot_data = data['plotData']
 
-    print(parameters)
+    print("Parameters received:", parameters)
     sec = section_index
     i = sec  # converting to 0-based index
-    print(i)
+    print("Section index:", i)
 
     # Extract current section data
     current_section = geo_data[i]
     
     # Calculate current chord
     chord = current_section['G2SECT'] - current_section['G1SECT']
-
-    # Parse upper and lower surface coordinates from [x, y] format to separate X and Z arrays
-    current_section['XUS'] = [point[0] for point in current_section['US']]
-    current_section['ZUS'] = [point[1] for point in current_section['US']]
-    current_section['XLS'] = [point[0] for point in current_section['LS']]
-    current_section['ZLS'] = [point[1] for point in current_section['LS']]
-    
     
     # Extract new parameters
-    nXLE = float(parameters['XLE'])
-    ntwist = float(parameters['Twist'])
-    dHSECT = float(parameters['Dihedral'])  # Default to current if not provided
-    dchord = float(parameters['Chord'])
-    dysect = float(parameters.get('YSECT', current_section['YSECT']))  # Default to current if not provided
-    
-    # Calculate differences and transformations
-    # Assuming geo_data contains twist in degrees, convert difference to radians
-    current_twist_deg = current_section['TWIST']  # Current twist in degrees
-    dtwist = (ntwist - current_twist_deg) * (math.pi / 180)  # Difference in radians
-    
-    nHSECT = dHSECT - current_section['HSECT']
-    scale = dchord / chord
-    
-    # Calculate XLE offset
-    dXLE = nXLE - current_section['XUS'][0] - (current_section['XUS'][0] * (scale - 1))
-    nZLE = current_section['ZUS'][0] * (scale - 1)
+    new_xle = float(parameters.get('XLE', current_section['G1SECT']))
+    new_xte = float(parameters.get('XTE', current_section['G2SECT'])) 
+    new_twist = float(parameters.get('Twist', current_section['TWIST']))
+    new_dihedral = float(parameters.get('Dihedral', current_section['HSECT']))
+    new_ysect = float(parameters.get('YSECT', current_section['YSECT']))
+    new_chord = float(parameters.get('Chord', chord))
 
-    ## Modify Section
+    # Check if geometry parameters (YSECT, XLE, XTE) have changed
+    geometry_changed = False
     
-    # Update twist if changed (round to 5 decimal places for comparison)
-    if round(dtwist, 5) != 0:
-        new_twist_deg = current_twist_deg + dtwist * (180 / math.pi)
-        current_section['TWIST'] = new_twist_deg
+    if 'YSECT' in parameters and abs(new_ysect - current_section['YSECT']) > 1e-5:
+        current_section['YSECT'] = new_ysect
+        geometry_changed = True
+        print(f"Updated YSECT to {new_ysect}")
     
-    # Update HSECT if changed
-    if round(nHSECT, 5) != 0:
-        current_section['HSECT'] = dHSECT
+    if 'XLE' in parameters and abs(new_xle - current_section['G1SECT']) > 1e-5:
+        current_section['G1SECT'] = new_xle
+        geometry_changed = True
+        print(f"Updated XLE (G1SECT) to {new_xle}")
     
-    # Update YSECT if changed
-    if round(dysect - current_section['YSECT'], 4) != 0:
-        current_section['YSECT'] = dysect
-    
-    # Update chord if changed
-    if round(dchord - chord, 5) != 0:
-        current_section['CHORD'] = dchord
-    
-    # Update XLE if changed
-    if round(dXLE, 4) != 0:
-        current_section['XLE'] = nXLE
+    if 'XTE' in parameters and abs(new_xte - current_section['G2SECT']) > 1e-5:
+        current_section['G2SECT'] = new_xte
+        geometry_changed = True
+        print(f"Updated XTE (G2SECT) to {new_xte}")
 
-    # Transform upper surface coordinates (XUS, ZUS)
-    if 'XUS_N' not in current_section:
-        current_section['XUS_N'] = []
-        current_section['ZUS_N'] = []
+    # If chord was modified, update XTE based on XLE + chord
+    if 'Chord' in parameters and abs(new_chord - chord) > 1e-5:
+        current_section['G2SECT'] = current_section['G1SECT'] + new_chord
+        geometry_changed = True
+        print(f"Updated chord to {new_chord}, XTE (G2SECT) to {current_section['G2SECT']}")
+
+    # Step 1: Generate plot data from updated geoData (if geometry changed)
+    if geometry_changed:
+        plot_data = rG.airfoils(geo_data)
+        print("Regenerated plot data due to geometry changes")
     
-    current_section['XUS_N'] = []
-    current_section['ZUS_N'] = []
+    # Step 2: Apply rotation/translation for twist and dihedral changes in plotData
+    twist_changed = 'Twist' in parameters and abs(new_twist - current_section['TWIST']) > 1e-5
+    dihedral_changed = 'Dihedral' in parameters and abs(new_dihedral - current_section['HSECT']) > 1e-5
     
-    for n in range(len(current_section['XUS'])):
-        x_us = current_section['XUS'][n]
-        z_us = current_section['ZUS'][n]
-        g1_sect = current_section['G1SECT']
-        h_sect = current_section['HSECT']
+    if twist_changed or dihedral_changed:
+        print("Applying twist/dihedral transformations to plot data")
         
-        # Apply transformation: rotation + scaling + translation
-        x_us_n = ((((x_us) * math.cos(-dtwist)) - ((z_us) * math.sin(-dtwist))) * scale) + dXLE
+        # Get the current section's plot data
+        section_plot_data = plot_data[i]
         
-        z_us_n = ((((x_us) * math.sin(-dtwist)) + ((z_us) * math.cos(-dtwist))) * scale) + nZLE
+        # Calculate twist difference in radians
+        if twist_changed:
+            current_twist_deg = current_section['TWIST']
+            dtwist_rad = (new_twist - current_twist_deg) * (math.pi / 180)
+            print(f"Applying twist change: {current_twist_deg}° -> {new_twist}° (Δ={dtwist_rad} rad)")
+            
+            # Apply rotation to upper surface
+            xus_rotated = []
+            zus_rotated = []
+            for j in range(len(section_plot_data['xus'])):
+                x = section_plot_data['xus'][j]
+                z = section_plot_data['zus'][j]
+                
+                # Rotate around origin (leading edge should be at origin in airfoil coordinates)
+                x_rot = x * math.cos(-dtwist_rad) - z * math.sin(-dtwist_rad)
+                z_rot = x * math.sin(-dtwist_rad) + z * math.cos(-dtwist_rad)
+                
+                xus_rotated.append(x_rot)
+                zus_rotated.append(z_rot)
+            
+            # Apply rotation to lower surface
+            xls_rotated = []
+            zls_rotated = []
+            for j in range(len(section_plot_data['xls'])):
+                x = section_plot_data['xls'][j]
+                z = section_plot_data['zls'][j]
+                
+                x_rot = x * math.cos(-dtwist_rad) - z * math.sin(-dtwist_rad)
+                z_rot = x * math.sin(-dtwist_rad) + z * math.cos(-dtwist_rad)
+                
+                xls_rotated.append(x_rot)
+                zls_rotated.append(z_rot)
+            
+            # Store the rotated coordinates as new data
+            section_plot_data['xus_n'] = xus_rotated
+            section_plot_data['zus_n'] = zus_rotated
+            section_plot_data['xls_n'] = xls_rotated
+            section_plot_data['zls_n'] = zls_rotated
         
-        current_section['XUS_N'].append(x_us_n)
-        current_section['ZUS_N'].append(z_us_n)
-
-
-    # for n in range(len(current_section['XUS'])):
-    #     x0 = current_section['XUS_N'][0]
-    #     z0 = current_section['ZUS_N'][0]
-
-    #     current_section['XUS_N'][n] -= x0
-    #     current_section['ZUS_N'][n] -= z0
-
-    # Transform lower surface coordinates (XLS, ZLS)
-    if 'XLS_N' not in current_section:
-        current_section['XLS_N'] = []
-        current_section['ZLS_N'] = []
+        # Handle dihedral changes (if needed - this might involve y-coordinate translation)
+        if dihedral_changed:
+            print(f"Applying dihedral change: {current_section['HSECT']} -> {new_dihedral}")
+            # Dihedral typically affects the y-coordinate positioning of the section
+            # This might need specific implementation based on your coordinate system
+            
+    # Step 3: Update the geoData with new twist/dihedral values
+    if twist_changed:
+        current_section['TWIST'] = new_twist
+        print(f"Updated TWIST in geoData to {new_twist}")
     
-    current_section['XLS_N'] = []
-    current_section['ZLS_N'] = []
-    
-    for n in range(len(current_section['XLS'])):
+    if dihedral_changed:
+        current_section['HSECT'] = new_dihedral
+        print(f"Updated HSECT (Dihedral) in geoData to {new_dihedral}")
 
-        x_ls = current_section['XLS'][n]
-        z_ls = current_section['ZLS'][n]
-        g1_sect = current_section['G1SECT']
-        h_sect = current_section['HSECT']
-        
-        # Apply transformation: rotation + scaling + translation
-        x_ls_n = ((((x_ls) * math.cos(-dtwist)) - ((z_ls) * math.sin(-dtwist))) * scale) + dXLE
-        
-        z_ls_n = ((((x_ls) * math.sin(-dtwist)) + ((z_ls) * math.cos(-dtwist))) * scale) - nZLE
-        
-        current_section['XLS_N'].append(x_ls_n)
-        current_section['ZLS_N'].append(z_ls_n)
-
-    # for n in range(len(current_section['XLS'])):
-    #     x0 = current_section['XLS_N'][0]
-    #     z0 = current_section['ZLS_N'][0]
-
-    #     current_section['XLS_N'][n] -= x0
-    #     current_section['ZLS_N'][n] -= z0
-
-
-    # Generate updated plot data
-    plot_data2 = rG.airfoils(geo_data)
-
+    # Step 4: Return updated geoData and plotData
     return jsonify({
         'updatedGeoData': geo_data,
-        'updatedPlotData': plot_data2
+        'updatedPlotData': plot_data
     })
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)

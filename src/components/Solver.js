@@ -1,17 +1,15 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./Solver.css"; // Import the CSS file
-import SimulationRun from "./SimulationRun";
-import { useState } from 'react';
-
-
-
 
 const Results = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const [showPopup, setShowPopup] = useState(false);
     const result = location.state?.result || {};
+
+    const handleRunSimulation = () => {
+        navigate("/simulation-run", { state: { result } });
+    };
 
     return (
         <div className="results-container">
@@ -22,7 +20,7 @@ const Results = () => {
                     <span className="result-label">Simulation Name:</span>
                     <span className="result-value">{result.user_inputs?.simName}</span>
                 </div>
- 
+
                 <div className="result-item">
                     <span className="result-label">Mach Number:</span>
                     <span className="result-value">{result.user_inputs?.mach}</span>
@@ -46,18 +44,18 @@ const Results = () => {
                         </div>
                     )
                 )}
- 
+
             </div>
 
             <div className="start-btn">
-              <button className="sim-button" onClick={() => setShowPopup(true)}><span>Run VFP Simulation</span></button>
-              {showPopup && <SimulationRun onClose={() => setShowPopup(false)} />}
+                <button className="sim-button" onClick={handleRunSimulation}>
+                    <span>Run VFP Simulation</span>
+                </button>
             </div>
- 
+
             <button className="back-button" onClick={() => navigate("/run-solver")}>Go Back</button>
         </div>
     );
 };
 
 export default Results;
-
