@@ -135,6 +135,50 @@ const SimulationRunPage = () => {
     }
   };
 
+  const handleExportToVFPPost = async () => {
+    if (!formData) {
+      console.error("Error: No form data available in SimulationRun component.");
+      return;
+    }
+
+    const formObject = Object.fromEntries(formData.entries());
+    const simName = formObject.simName;
+
+    if (!simName) {
+      console.error("Error: Simulation name is missing in form data.");
+      return;
+    }
+
+    try {
+      // Request simulation folder data from server
+      const response = await fetch('http://127.0.0.1:5000/get-simulation-folder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ simName }),
+      });
+
+      if (response.ok) {
+        const folderData = await response.json();
+
+        // Navigate to post processing with the folder data
+        navigate('/post-processing', {
+          state: {
+            simulationFolder: folderData,
+            simName: simName
+          }
+        });
+      } else {
+        console.error('Failed to get simulation folder data');
+        alert('Failed to export simulation data. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error exporting to VFP Post:', error);
+      alert('Error exporting simulation data. Please try again.');
+    }
+  };
+
   const handleClose = () => {
     if (socket) {
       socket.disconnect();
@@ -201,6 +245,9 @@ const SimulationRunPage = () => {
         <div className="header-buttons">
           <button onClick={handleDownload} className="download-button">
             Download Files
+          </button>
+          <button onClick={handleExportToVFPPost} className="export-post-button">
+            Export to VFP Post
           </button>
           <button onClick={handleClose} className="close-button">
             Close

@@ -6,6 +6,7 @@ import os
 import shutil
 import signal
 import subprocess
+import tempfile
 import runVFP as run
 import readGEO as rG
 import zipfile
@@ -262,6 +263,60 @@ def handle_download(data):
 def handle_disconnect():
     print("Client disconnected")
 
+
+@app.route('/get-simulation-folder', methods=['POST'])
+def get_simulation_folder():
+    try:
+        data = request.get_json()
+        sim_name = data.get('simName')
+        
+        if not sim_name:
+            return jsonify({'error': 'Simulation name not provided'}), 400
+        
+        sim_folder_path = os.path.join('./Simulations', sim_name)
+        
+        if not os.path.exists(sim_folder_path):
+            return jsonify({'error': f'Simulation folder {sim_name} not found'}), 404
+        
+        # Get all files in the simulation folder
+        files = []
+        for root, dirs, filenames in os.walk(sim_folder_path):
+            for filename in filenames:
+                file_path = os.path.join(root, filename)
+                relative_path = os.path.relpath(file_path, sim_folder_path)
+                file_size = os.path.getsize(file_path)
+                file_modified = os.path.getmtime(file_path)
+                
+                files.append({
+                    'name': filename,
+                    'path': relative_path,
+                    'size': file_size,
+                    'modified': file_modified,
+                    'isDirectory': False
+                })
+            
+            # Add directories
+            for dirname in dirs:
+                dir_path = os.path.join(root, dirname)
+                relative_path = os.path.relpath(dir_path, sim_folder_path)
+                
+                files.append({
+                    'name': dirname,
+                    'path': relative_path,
+                    'size': 0,
+                    'modified': os.path.getmtime(dir_path),
+                    'isDirectory': True
+                })
+        
+        return jsonify({
+            'simName': sim_name,
+            'folderPath': sim_folder_path,
+            'files': files
+        })
+        
+    except Exception as e:
+        print(f"Error getting simulation folder: {str(e)}")
+        return jsonify({'error': str(e)}), 500
  
 
 @app.route('/import-geo', methods=['POST'])
@@ -551,6 +606,64 @@ def compute_desired():
         'updatedGeoData': geo_data,
         'updatedPlotData': plot_data
     })
+
+@app.route('/export-geo', methods=['POST'])
+def export_geo():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        geo_data = data.get('geoData')
+        original_filename = data.get('filename', 'wing.GEO')
+        
+        if not geo_data:
+            return jsonify({'error': 'No geoData provided'}), 400
+        
+        print(f"Exporting GEO file: {original_filename}")
+        print(f"Number of sections: {len(geo_data)}")
+        
+        # Create modified filename by removing extension and adding _modified.GEO
+        if original_filename.upper().endswith('.GEO'):
+            base_name = original_filename[:-4]  # Remove .GEO extension
+        else:
+            base_name = original_filename
+        
+        modified_filename = f"{base_name}_modified.GEO"
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.GEO', delete=False) as temp_file:
+            temp_filepath = temp_file.name
+        
+        try:
+            # Call the writeGEO function from readGEO module
+            rG.writeGEO(temp_filepath, geo_data)
+            
+            print(f"Generated modified filename: {modified_filename}")
+            
+            # Send the file to client with modified filename
+            return send_file(
+                temp_filepath, 
+                as_attachment=True, 
+                download_name=modified_filename,
+                mimetype='application/octet-stream'
+            )
+            
+        except Exception as e:
+            print(f"Error writing GEO file: {str(e)}")
+            return jsonify({'error': f'Error writing GEO file: {str(e)}'}), 500
+        
+        finally:
+            # Clean up the temporary file after sending
+            try:
+                if os.path.exists(temp_filepath):
+                    os.remove(temp_filepath)
+            except Exception as cleanup_error:
+                print(f"Warning: Could not clean up temp file: {cleanup_error}")
+    
+    except Exception as e:
+        print(f"Error in export_geo endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

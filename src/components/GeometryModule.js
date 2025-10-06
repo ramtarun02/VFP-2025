@@ -92,6 +92,68 @@ function GeometryModule() {
     event.target.value = '';
   };
 
+  const exportGeoFile = async () => {
+    if (!selectedGeoFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    try {
+      const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
+      const originalFilename = selectedGeoFile.fullName || `${selectedGeoFile.name}.GEO`;
+
+      const response = await fetch('http://127.0.0.1:5000/export-geo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          geoData: geoData,
+          filename: originalFilename
+        }),
+      });
+
+      if (response.ok) {
+        // Get the filename from response headers or use default
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = `${selectedGeoFile.name}_modified.GEO`;
+
+        if (contentDisposition && contentDisposition.includes('filename=')) {
+          filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+        }
+
+        // Create blob from response
+        const blob = await response.blob();
+
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+
+        // Trigger download
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        console.log(`GEO file exported as: ${filename}`);
+      } else {
+        const errorData = await response.json();
+        console.error('Export failed:', errorData.error);
+        alert(`Export failed: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error exporting GEO file:', error);
+      alert('Error exporting GEO file');
+    }
+  };
+
+
+
   const handleGeoFileSelection = (event) => {
     const fileId = parseInt(event.target.value);
     const selectedFile = geoFiles.find(file => file.id === fileId);
@@ -400,7 +462,7 @@ function GeometryModule() {
           </div>
         </div>
         <div className="header-group">
-          <button className="btn btn-secondary">Export GEO file</button>
+          <button className="btn btn-secondary" onClick={exportGeoFile}>Export GEO file</button>
           <button className="btn btn-secondary">Save plots</button>
           <button className="btn btn-danger" onClick={() => window.location.reload(false)}>Reset</button>
         </div>
