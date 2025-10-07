@@ -151,80 +151,306 @@ def stream_process(command, cwd):
         emit('message', f"Error during execution: {str(e)}")
 
 
+current_process = None  # Global reference
+
+def stream_bat_process(bat_file_path, cwd, args=None):
+    """Stream output from a .bat file execution with arguments"""
+    global current_process
+    try:
+        # Ensure we're using the full path and proper command format
+        if not os.path.isabs(bat_file_path):
+            bat_file_path = os.path.abspath(bat_file_path)
+        
+        emit('message', f"Executing batch file: {bat_file_path}")
+        emit('message', f"Working directory: {cwd}")
+        
+        # Build command with arguments
+        if args:
+            command = ['cmd', '/c', os.path.basename(bat_file_path)] + args
+            emit('message', f"Arguments: {' '.join(args)}")
+        else:
+            command = ['cmd', '/c', os.path.basename(bat_file_path)]
+        
+        emit('message', f"Full command: {' '.join(command)}")
+        
+        current_process = subprocess.Popen(
+            command, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True, 
+            cwd=cwd,
+            shell=False
+        )
+
+        # Stream output line-by-line
+        for line in iter(current_process.stdout.readline, ''):
+            if line:
+                clean_line = line.strip()
+                print(clean_line)
+                emit('message', clean_line)
+
+        current_process.stdout.close()
+        return_code = current_process.wait()
+        
+        if return_code == 0:
+            emit('message', '[DONE] Solver Run Complete')
+        else:
+            emit('message', f'Solver completed with return code: {return_code}')
+            emit('message', 'Check the batch file for syntax errors or missing dependencies')
+
+    except Exception as e:
+        emit('message', f"Error during BAT execution: {str(e)}")
+        print(f"Full error details: {e}")
+
+def stream_bat_process_alternative(bat_file_path, cwd, args=None):
+    """Alternative method to stream batch file output with arguments"""
+    global current_process
+    try:
+        # Change to the working directory first
+        original_cwd = os.getcwd()
+        os.chdir(cwd)
+        
+        emit('message', f"Changed to directory: {cwd}")
+        emit('message', f"Executing: {os.path.basename(bat_file_path)}")
+        
+        # Build command with arguments
+        if args:
+            command = f"{os.path.basename(bat_file_path)} {' '.join(args)}"
+            emit('message', f"Command with args: {command}")
+        else:
+            command = os.path.basename(bat_file_path)
+        
+        # Execute the batch file with arguments
+        current_process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True,
+            shell=True
+        )
+
+        # Stream output line-by-line
+        for line in iter(current_process.stdout.readline, ''):
+            if line:
+                clean_line = line.strip()
+                print(clean_line)
+                emit('message', clean_line)
+
+        current_process.stdout.close()
+        return_code = current_process.wait()
+        
+        if return_code == 0:
+            emit('message', '[DONE] Solver Run Complete')
+        else:
+            emit('message', f'Solver completed with return code: {return_code}')
+
+    except Exception as e:
+        emit('message', f"Error during BAT execution: {str(e)}")
+    finally:
+        # Always change back to original directory
+        os.chdir(original_cwd)
+
 @socketio.on('start_simulation')
 def start_simulation(data=None):
     if data and 'simName' in data:
         try: 
-
             # Retrieve the simulation name from the request
             sim_name = data['simName']
 
             if not sim_name:
-                return jsonify({"error": "Simulation name not provided"}), 400
+                emit('error', "Simulation name not provided")
+                return
 
             sim_folder = os.path.join('./Simulations', sim_name)
 
             if not os.path.exists(sim_folder):
-                return jsonify({"error": f"Simulation folder '{sim_folder}' not found"}), 404
+                emit('error', f"Simulation folder '{sim_folder}' not found")
+                return
 
-            # Variables to store the filenames without extensions
-            map_file = geo_file = dat_file = None
+            # Get specific file names from client data - use the correct keys
+            map_filename = data.get('mapFile', '')
+            geo_filename = data.get('geoFile', '')
+            dat_filename = data.get('datFile', '')
 
-            # List all files in the simulation folder
-            for filename in os.listdir(sim_folder):
-                # Check file extensions
-                if filename.endswith(".map"):
-                    # map_file = filename
-                    map_file = os.path.splitext(filename)[0]  # Remove extension
-                elif filename.endswith(".GEO"):
-                    # geo_file = filename
-                    geo_file = os.path.splitext(filename)[0]  # Remove extension
-                elif filename.endswith(".dat"):
-                    dat_file = filename
-                    # dat_file = os.path.splitext(filename)[0]  # Remove extension
-            
+            print(f"Client provided files: map={map_filename}, geo={geo_filename}, dat={dat_filename}")
 
-            dump_file = data['dumpName']
-            print(map_file, geo_file, dat_file, dump_file)
+            # Validate that file names are provided
+            if not map_filename or not geo_filename or not dat_filename:
+                emit('error', f"Missing file names. Received: map='{map_filename}', geo='{geo_filename}', dat='{dat_filename}'")
+                return
 
-            # If any file is missing, return an error
-            if not map_file or not geo_file or not dat_file:
-                return jsonify({"error": "Required files (.map, .GEO, .dat) are missing in the folder"}), 400
-            
+            # Check if the specified files exist in the simulation folder
+            map_file_path = os.path.join(sim_folder, map_filename)
+            geo_file_path = os.path.join(sim_folder, geo_filename)
+            dat_file_path = os.path.join(sim_folder, dat_filename)
+
+            missing_files = []
+            if not os.path.exists(map_file_path):
+                missing_files.append(f"Map file: {map_filename}")
+            if not os.path.exists(geo_file_path):
+                missing_files.append(f"GEO file: {geo_filename}")
+            if not os.path.exists(dat_file_path):
+                missing_files.append(f"DAT file: {dat_filename}")
+
+            if missing_files:
+                emit('error', f"Missing files in simulation folder: {', '.join(missing_files)}")
+                return
+
+            emit('message', f"Found all required files: {map_filename}, {geo_filename}, {dat_filename}")
+
+            # Remove file extensions for batch file arguments
+            map_file = os.path.splitext(map_filename)[0]  # Remove extension
+            geo_file = os.path.splitext(geo_filename)[0]  # Remove extension
+            dat_file = os.path.splitext(dat_filename)[0]  # Remove extension
+
             # Extract boolean values and store as 'y' (true) or 'n' (false)
-            con= 'y' if data.get("continuation", "false").lower() == "true" else 'n'
-            auto= 'y' if data.get("autoRunner", "false").lower() == "true" else 'n'
-            exc = 'y' if data.get("excrescence", "false").lower() == "true" else 'n'
-            dump = 'y' if data.get("dump", "false").lower() == "true" else 'n'
-            print(exc, con, dump)
+            con = data.get("continuation", "false").lower() == "true"
+            auto = data.get("autoRunner", "false").lower() == "true"
+            exc = data.get("excrescence", "false").lower() == "true"
+            dump = data.get("dump", "false").lower() == "true"
+            
+            dump_file = data.get('dumpName', '')
+            # Remove extension from dump file name if present
+            if dump_file and '.' in dump_file:
+                dump_file = os.path.splitext(dump_file)[0]
 
-            # Retrieve the simulation name directly from the received form data
-            sim_name = data['simName']
-            sim_folder = os.path.join("Simulations/", sim_name)
-            print(f"Simulation started for: {sim_name}")
-
-            script_dir = os.path.dirname(os.path.abspath(__file__))  # Get the current script's directory
-            bat_file_path = os.path.join(script_dir, sim_folder, "run_vfp.bat")  # Adjust subdir name
-
+            print(f"Configuration: con={con}, auto={auto}, exc={exc}, dump={dump}")
+            print(f"Files (without extensions): map={map_file}, geo={geo_file}, dat={dat_file}, dump={dump_file}")
 
             emit('message', f"Simulation started for {sim_name}")
 
+            # Copy necessary files to simulation folder
             emit('message', run.copy_files_to_folder("./vfp-solver", sim_folder))
             run.copy_files_to_folder("./Python Utils", sim_folder)
 
-             # Now use this function based on `con` value
-            if auto == 'y':
-                stream_process(["python", "VFP_Full_Process.py", dat_file, data["dalpha"], data["alphaN"], map_file, geo_file], sim_folder)
-            else:
-                stream_process(["python", "VFP_Full_Process.py", dat_file, "1", "1", map_file, geo_file], sim_folder)
+            # Path to the batch file
+            bat_file_path = os.path.join(sim_folder, "runvfphe_v4.bat")
 
+            # Check if batch file exists
+            if not os.path.exists(bat_file_path):
+                emit('error', f"Batch file 'runvfphe_v4.bat' not found in {sim_folder}")
+                return
+
+            # Rest of the function remains the same...
+            # Decision logic based on configuration
+            if auto and not con and not exc:
+                # Case 3: Auto runner mode
+                emit('message', "Running in Auto Runner mode...")
+                
+                dalpha = data.get("dalpha", "1")
+                alphaN = data.get("alphaN", "1")
+                
+                # Use stream_process to run VFP_Full_Process.py
+                # Use full filename with extension for Python script
+                stream_process([
+                    "python", "VFP_Full_Process.py", 
+                    dat_filename, dalpha, alphaN, map_file, geo_file
+                ], sim_folder)
+
+            elif con and not auto and not exc:
+                # Case 2: Continuation mode
+                emit('message', "Running in Continuation mode...")
+                
+                # Check if dump file exists when continuation is true
+                if dump_file:
+                    # Check for .fort52 file specifically (as per bat file)
+                    dump_file_path = os.path.join(sim_folder, dump_file + ".fort52")
+                    if not os.path.exists(dump_file_path):
+                        emit('error', f"Dump file '{dump_file}.fort52' not found in simulation folder")
+                        return
+                    emit('message', f"Found dump file: {dump_file}.fort52")
+                else:
+                    emit('error', "Dump file name is required for continuation run")
+                    return
+
+                # Prepare arguments for continuation mode
+                bat_args = [
+                    map_file,           # map_base (without extension)
+                    geo_file,           # geo_base (without extension)  
+                    dat_file,           # flow_base (without extension)
+                    "n",                # excres = no
+                    "y",                # cont = yes
+                    dump_file           # dump_base (without extension)
+                ]
+
+                emit('message', f"Batch arguments: {' '.join(bat_args)}")
+
+                # Try the main method first, then fallback to alternative
+                try:
+                    stream_bat_process(bat_file_path, sim_folder, bat_args)
+                except Exception as e:
+                    emit('message', f"Primary method failed: {str(e)}")
+                    emit('message', "Trying alternative execution method...")
+                    stream_bat_process_alternative(bat_file_path, sim_folder, bat_args)
+
+            elif not con and not auto and not exc:
+                # Case 1: Standard mode (all false)
+                emit('message', "Running in Standard mode...")
+                
+                # Prepare arguments for standard mode
+                bat_args = [
+                    map_file,           # map_base (without extension)
+                    geo_file,           # geo_base (without extension)
+                    dat_file,           # flow_base (without extension)
+                    "n",                # excres = no
+                    "n",                # cont = no
+                    ""                  # dump_base = empty for standard mode
+                ]
+
+                emit('message', f"Batch arguments: {' '.join(bat_args)}")
+
+                # Try the main method first, then fallback to alternative
+                try:
+                    stream_bat_process(bat_file_path, sim_folder, bat_args)
+                except Exception as e:
+                    emit('message', f"Primary method failed: {str(e)}")
+                    emit('message', "Trying alternative execution method...")
+                    stream_bat_process_alternative(bat_file_path, sim_folder, bat_args)
+
+            elif exc and not con and not auto:
+                # Case 4: Excrescence mode
+                emit('message', "Running in Excrescence mode...")
+                
+                # Prepare arguments for excrescence mode
+                bat_args = [
+                    map_file,           # map_base (without extension)
+                    geo_file,           # geo_base (without extension)
+                    dat_file,           # flow_base (without extension)
+                    "y",                # excres = yes
+                    "n",                # cont = no
+                    ""                  # dump_base = empty for excrescence mode
+                ]
+
+                emit('message', f"Batch arguments: {' '.join(bat_args)}")
+
+                # Try the main method first, then fallback to alternative
+                try:
+                    stream_bat_process(bat_file_path, sim_folder, bat_args)
+                except Exception as e:
+                    emit('message', f"Primary method failed: {str(e)}")
+                    emit('message', "Trying alternative execution method...")
+                    stream_bat_process_alternative(bat_file_path, sim_folder, bat_args)
+
+            else:
+                # Handle invalid combinations
+                if con and auto:
+                    emit('error', "Cannot run both Continuation and Auto Runner simultaneously")
+                elif con and exc:
+                    emit('error', "Cannot run both Continuation and Excrescence simultaneously")
+                elif auto and exc:
+                    emit('error', "Cannot run both Auto Runner and Excrescence simultaneously")
+                else:
+                    emit('error', "Invalid configuration combination")
 
         except Exception as e:
             print(f"Error processing simulation data: {e}")
-            emit('error', "Could not process simulation data")
+            emit('error', f"Could not process simulation data: {str(e)}")
     else:
         print("No simulation data provided or 'simName' missing")
         emit('error', "Simulation data missing required fields")
+
+
+
 
 @socketio.on('download')
 def handle_download(data):
@@ -264,19 +490,20 @@ def handle_disconnect():
     print("Client disconnected")
 
 
-@app.route('/get-simulation-folder', methods=['POST'])
-def get_simulation_folder():
+@socketio.on('get_simulation_folder')
+def handle_get_simulation_folder(data):
     try:
-        data = request.get_json()
         sim_name = data.get('simName')
         
         if not sim_name:
-            return jsonify({'error': 'Simulation name not provided'}), 400
+            emit('error', {'type': 'simulation_folder_error', 'message': 'Simulation name not provided'})
+            return
         
         sim_folder_path = os.path.join('./Simulations', sim_name)
         
         if not os.path.exists(sim_folder_path):
-            return jsonify({'error': f'Simulation folder {sim_name} not found'}), 404
+            emit('error', {'type': 'simulation_folder_error', 'message': f'Simulation folder {sim_name} not found'})
+            return
         
         # Get all files in the simulation folder
         files = []
@@ -308,16 +535,60 @@ def get_simulation_folder():
                     'isDirectory': True
                 })
         
-        return jsonify({
-            'simName': sim_name,
-            'folderPath': sim_folder_path,
-            'files': files
+        emit('simulation_folder_ready', {
+            'success': True,
+            'data': {
+                'simName': sim_name,
+                'folderPath': sim_folder_path,
+                'files': files
+            },
+            'simName': sim_name
         })
         
     except Exception as e:
         print(f"Error getting simulation folder: {str(e)}")
+        emit('error', {
+            'type': 'simulation_folder_error',
+            'message': str(e)
+        })
+
+
+
+# Add this route to your Flask app
+
+@app.route('/get_file_content', methods=['POST'])
+def get_file_content():
+    try:
+        data = request.get_json()
+        sim_name = data.get('simName')
+        file_path = data.get('filePath')
+        
+        if not sim_name or not file_path:
+            return jsonify({'error': 'Missing simName or filePath'}), 400
+        
+        # Construct full path
+        full_path = os.path.join('./Simulations', sim_name, file_path)
+        
+        # Security check - ensure path is within simulations directory
+        abs_sim_path = os.path.abspath(os.path.join('./Simulations', sim_name))
+        abs_file_path = os.path.abspath(full_path)
+        
+        if not abs_file_path.startswith(abs_sim_path):
+            return jsonify({'error': 'Invalid file path'}), 403
+        
+        if not os.path.exists(full_path):
+            return jsonify({'error': 'File not found'}), 404
+        
+        # Read and return file content
+        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        
+        return content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+        
+    except Exception as e:
+        print(f"Error reading file: {str(e)}")
         return jsonify({'error': str(e)}), 500
- 
+
 
 @app.route('/import-geo', methods=['POST'])
 def import_geo():

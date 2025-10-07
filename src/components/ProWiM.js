@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./ProWiM.css";
 import Prowim3Dmodel from "./Prowim3Dmodel";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -13,7 +13,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { ticks } from "d3";
 
 ChartJS.register(
   CategoryScale,
@@ -43,7 +42,13 @@ function computeKS0D(CL0, CD0, A) {
 
 function PropellerWingForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPlots, setShowPlots] = useState(false);
+  const [isPolarPanelOpen, setIsPolarPanelOpen] = useState(true);
+  const [csvFiles, setCsvFiles] = useState([]);
+  const [selectedCsvFile, setSelectedCsvFile] = useState(null);
+  const [polarData, setPolarData] = useState(null);
+  const [simulationData, setSimulationData] = useState(null);
 
   const [formData, setFormData] = useState({
     A: "11",
@@ -72,6 +77,244 @@ function PropellerWingForm() {
     KS00: [0.001]
   });
 
+  // Process simulation data when component mounts or location state changes
+  useEffect(() => {
+    console.log('ProWiM Location state received:', location.state);
+
+    if (location.state && location.state.simulationFolder) {
+      const receivedData = location.state.simulationFolder;
+      let finalData = null;
+
+      if (receivedData.data) {
+        finalData = receivedData.data;
+      } else {
+        finalData = receivedData;
+      }
+
+      setSimulationData(finalData);
+      scanForCsvFiles(finalData);
+    }
+  }, [location.state]);
+
+  // Scan for CSV files in the simulation folder
+  const scanForCsvFiles = (simData) => {
+    if (!simData || !simData.files) {
+      console.log('No simulation data or files found');
+      setCsvFiles([]);
+      return;
+    }
+
+    const files = simData.files;
+    let csvFileList = [];
+
+    // Check if files is an array or object
+    if (Array.isArray(files)) {
+      csvFileList = files.filter(file =>
+        file.name && file.name.toLowerCase().endsWith('.csv')
+      );
+    } else if (typeof files === 'object') {
+      // Check in different file type categories
+      Object.values(files).forEach(fileTypeArray => {
+        if (Array.isArray(fileTypeArray)) {
+          const csvs = fileTypeArray.filter(file =>
+            file.name && file.name.toLowerCase().endsWith('.csv')
+          );
+          csvFileList = csvFileList.concat(csvs);
+        }
+      });
+
+      // Also check if there's a direct 'csv' category
+      if (files.csv && Array.isArray(files.csv)) {
+        csvFileList = csvFileList.concat(files.csv);
+      }
+
+      // Check 'other' category for CSV files
+      if (files.other && Array.isArray(files.other)) {
+        const csvs = files.other.filter(file =>
+          file.name && file.name.toLowerCase().endsWith('.csv')
+        );
+        csvFileList = csvFileList.concat(csvs);
+      }
+    }
+
+    console.log('Found CSV files:', csvFileList);
+    setCsvFiles(csvFileList);
+  };
+
+  // Fetch CSV file content from server
+  const fetchCsvFile = async (file) => {
+    try {
+      console.log('Fetching CSV file:', file);
+
+      const simName = simulationData?.simName || 'unknown';
+      console.log('Using simulation name:', simName);
+      console.log('File path:', file.path);
+
+      const response = await fetch(`http://127.0.0.1:5000/get_file_content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          simName: simName,
+          filePath: file.path || file.name
+        })
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const content = await response.text();
+      console.log('CSV file content fetched successfully, length:', content.length);
+      return content;
+
+    } catch (error) {
+      console.error('Error fetching CSV file content:', error);
+
+      if (error.message.includes('Failed to fetch')) {
+        alert(`Network error loading file ${file.name}. Please check if the backend server is running on http://127.0.0.1:5000`);
+      } else if (error.message.includes('404')) {
+        alert(`File ${file.name} not found on server.`);
+      } else {
+        alert(`Error loading file ${file.name}: ${error.message}`);
+      }
+      return null;
+    }
+  };
+
+  // Parse CSV content for polar data
+  const parseCsvContent = (content) => {
+    try {
+      const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+
+      if (lines.length === 0) {
+        throw new Error('CSV file is empty');
+      }
+
+      // Find header line (look for Alpha, CL, CD columns)
+      let headerIndex = -1;
+      let alphaIndex = -1;
+      let clIndex = -1;
+      let cdIndex = -1;
+
+      for (let i = 0; i < Math.min(5, lines.length); i++) {
+        const headers = lines[i].split(/[,;\t]/).map(h => h.trim().toLowerCase());
+
+        // Look for column indices
+        alphaIndex = headers.findIndex(h =>
+          h.includes('alpha') || h.includes('angle') || h.includes('aoa') || h === 'α'
+        );
+        clIndex = headers.findIndex(h =>
+          h.includes('cl') || h.toLowerCase() === 'lift'
+        );
+        cdIndex = headers.findIndex(h =>
+          h.includes('cd') || h.toLowerCase() === 'drag'
+        );
+
+        if (alphaIndex !== -1 && clIndex !== -1 && cdIndex !== -1) {
+          headerIndex = i;
+          break;
+        }
+      }
+
+      if (headerIndex === -1) {
+        throw new Error('Could not find Alpha, CL, and CD columns in CSV file');
+      }
+
+      // Parse data rows
+      const dataRows = lines.slice(headerIndex + 1);
+      const polarData = {
+        alpha: [],
+        cl: [],
+        cd: []
+      };
+
+      dataRows.forEach((line, index) => {
+        const values = line.split(/[,;\t]/).map(v => v.trim());
+
+        if (values.length > Math.max(alphaIndex, clIndex, cdIndex)) {
+          const alpha = parseFloat(values[alphaIndex]);
+          const cl = parseFloat(values[clIndex]);
+          const cd = parseFloat(values[cdIndex]);
+
+          if (!isNaN(alpha) && !isNaN(cl) && !isNaN(cd)) {
+            polarData.alpha.push(alpha);
+            polarData.cl.push(cl);
+            polarData.cd.push(cd);
+          }
+        }
+      });
+
+      if (polarData.alpha.length === 0) {
+        throw new Error('No valid data rows found in CSV file');
+      }
+
+      console.log('Parsed polar data:', polarData);
+      return polarData;
+
+    } catch (error) {
+      console.error('Error parsing CSV content:', error);
+      alert(`Error parsing CSV file: ${error.message}`);
+      return null;
+    }
+  };
+
+  // Handle CSV file selection
+  const handleCsvFileSelect = async (file) => {
+    setSelectedCsvFile(file);
+
+    let content = null;
+
+    if (file.file) {
+      // From folder import - has actual File object
+      try {
+        content = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = (e) => reject(e);
+          reader.readAsText(file.file);
+        });
+      } catch (error) {
+        console.error('Error reading local CSV file:', error);
+        alert(`Error reading CSV file: ${error.message}`);
+        return;
+      }
+    } else {
+      // From server - need to fetch content
+      content = await fetchCsvFile(file);
+      if (!content) return;
+    }
+
+    // Parse the CSV content
+    const parsed = parseCsvContent(content);
+    if (parsed) {
+      setPolarData(parsed);
+
+      // Auto-populate form fields
+      setArrayInputs(prev => ({
+        ...prev,
+        ALFAWI: parsed.alpha,
+        CL0: parsed.cl,
+        CD0: parsed.cd
+      }));
+
+      // Update display values
+      setFormData(prev => ({
+        ...prev,
+        ALFAWI: parsed.alpha.join(', '),
+        CL0: parsed.cl.map(v => v.toFixed(3)).join(', '),
+        CD0: parsed.cd.map(v => v.toFixed(4)).join(', ')
+      }));
+
+      console.log('Auto-populated form with polar data');
+    }
+  };
+
   // Compute KS00 array whenever A, CL0, or CD0 changes
   useEffect(() => {
     const A = parseFloat(formData.A);
@@ -93,21 +336,17 @@ function PropellerWingForm() {
 
   const handleArrayChange = (name, value) => {
     // Parse comma-separated AND space-separated values
-    // First replace commas with spaces, then split by spaces and filter
     const values = value
-      .replace(/,/g, ' ')  // Replace all commas with spaces
-      .split(/\s+/)        // Split by one or more whitespace characters
-      .map(v => v.trim())  // Trim each value
-      .filter(v => v !== '') // Remove empty strings
-      .map(v => parseFloat(v)) // Convert to numbers
-      .filter(v => !isNaN(v)); // Remove invalid numbers
+      .replace(/,/g, ' ')
+      .split(/\s+/)
+      .map(v => v.trim())
+      .filter(v => v !== '')
+      .map(v => parseFloat(v))
+      .filter(v => !isNaN(v));
 
     setArrayInputs(prev => ({ ...prev, [name]: values }));
-
-    // Update display value
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,7 +369,7 @@ function PropellerWingForm() {
       if (response.ok) {
         const data = await response.json();
         setResult(data.results);
-        setShowPlots(false); // Reset to show 3D model when new results come
+        setShowPlots(false);
       } else {
         const errorText = await response.text();
         console.error("Error:", response.statusText, errorText);
@@ -154,7 +393,6 @@ function PropellerWingForm() {
       return;
     }
 
-    // Prepare data for export
     const headers = ['Set', 'ALFAWI', 'CL0', 'CD0', 'KS00', 'CL_Prop', 'CD_Prop'];
     const rows = result.map((res, index) => [
       index + 1,
@@ -171,12 +409,10 @@ function PropellerWingForm() {
     let mimeType = '';
 
     if (format === 'csv') {
-      // CSV format
       content = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
       filename = 'prowim_results.csv';
       mimeType = 'text/csv';
     } else if (format === 'txt') {
-      // Space-separated format
       const columnWidths = headers.map((header, colIndex) =>
         Math.max(
           header.length,
@@ -192,7 +428,6 @@ function PropellerWingForm() {
       mimeType = 'text/plain';
     }
 
-    // Create and download file
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -204,16 +439,13 @@ function PropellerWingForm() {
     URL.revokeObjectURL(url);
   };
 
-  // Add dropdown export function
   const handleExportDropdown = (event) => {
     const format = event.target.value;
     if (format) {
       handleExportResults(format);
-      // Reset dropdown
       event.target.value = '';
     }
   };
-
 
   // Prepare chart data
   const prepareChartData = () => {
@@ -240,7 +472,7 @@ function PropellerWingForm() {
           data: cl0Values,
           borderColor: 'rgb(54, 162, 235)',
           backgroundColor: 'rgba(54, 162, 235, 0.2)',
-          borderDash: [5, 5], // Dashed line for input values
+          borderDash: [5, 5],
           tension: 0.1,
         },
       ],
@@ -261,7 +493,7 @@ function PropellerWingForm() {
           data: cd0Values,
           borderColor: 'rgb(255, 159, 64)',
           backgroundColor: 'rgba(255, 159, 64, 0.2)',
-          borderDash: [5, 5], // Dashed line for input values
+          borderDash: [5, 5],
           tension: 0.1,
         },
       ],
@@ -291,7 +523,7 @@ function PropellerWingForm() {
         },
         ticks: {
           callback: function (value, index, values) {
-            return Number(this.getLabelForValue(value)).toFixed(3); // Format ticks to 1 decimal place
+            return Number(this.getLabelForValue(value)).toFixed(3);
           }
         }
       },
@@ -304,173 +536,237 @@ function PropellerWingForm() {
     },
   };
 
-  return (
-    <div className="prowim-container">
-      <div className="model-viewer">
-        {!showPlots ? (
-          <Prowim3Dmodel
-            bOverD={parseFloat(formData.bOverD)}
-            cOverD={parseFloat(formData.cOverD)}
-            D={parseFloat(formData.D)}
-            propLocation={parseFloat(formData.propLocation)}
-          />
-        ) : (
-          <div className="plots-container">
-            <div className="plot-controls">
-              <button type="button" onClick={handleBackToModel} className="btn btn-secondary">
-                Back to 3D Model
-              </button>
-            </div>
-            {clData && cdData && (
-              <div className="charts">
-                <div className="chart">
-                  <h4>CL vs Angle of Attack</h4>
-                  <Line data={clData} options={chartOptions} />
-                </div>
-                <div className="chart">
-                  <h4>CD vs Angle of Attack</h4>
-                  <Line data={cdData} options={chartOptions} />
-                </div>
+  // Render polar data panel
+  const renderPolarPanel = () => {
+    return (
+      <div className={`polar-panel ${isPolarPanelOpen ? 'open' : 'closed'}`}>
+        <div className="polar-panel-header">
+          <h3>Polar Data</h3>
+          <button
+            className="toggle-polar-btn"
+            onClick={() => setIsPolarPanelOpen(!isPolarPanelOpen)}
+          >
+            {isPolarPanelOpen ? '◀' : '▶'}
+          </button>
+        </div>
+
+        {isPolarPanelOpen && (
+          <div className="polar-panel-content">
+            {csvFiles.length === 0 ? (
+              <div className="no-polars-message">
+                <p>No Polars found</p>
+                <small>No CSV files detected in the simulation folder</small>
+              </div>
+            ) : (
+              <div className="csv-files-list">
+                <h4>Available CSV Files:</h4>
+                {csvFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className={`csv-file-item ${selectedCsvFile?.name === file.name ? 'selected' : ''}`}
+                    onClick={() => handleCsvFileSelect(file)}
+                    title={file.name}
+                  >
+                    <span className="file-icon">📊</span>
+                    <span className="file-name">{file.name}</span>
+                    {selectedCsvFile?.name === file.name && (
+                      <span className="selected-indicator">✓</span>
+                    )}
+                  </div>
+                ))}
+
+                {polarData && (
+                  <div className="polar-data-info">
+                    <h4>Loaded Polar Data:</h4>
+                    <p>Points: {polarData.alpha.length}</p>
+                    <p>Alpha range: {Math.min(...polarData.alpha).toFixed(1)}° to {Math.max(...polarData.alpha).toFixed(1)}°</p>
+                    <p>CL range: {Math.min(...polarData.cl).toFixed(3)} to {Math.max(...polarData.cl).toFixed(3)}</p>
+                    <p>CD range: {Math.min(...polarData.cd).toFixed(4)} to {Math.max(...polarData.cd).toFixed(4)}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
+    );
+  };
 
-      <div className="form-container">
-        <form onSubmit={handleSubmit}>
-          {[
-            { label: "Wing Aspect Ratio (A)", name: "A" },
-            { label: "b / D", name: "bOverD" },
-            { label: "c / D", name: "cOverD" },
-            { label: "Angle of attack at zero lift (α₀) [deg]", name: "alpha0" },
-            { label: "Total number of propellers (N)", name: "N" },
-            { label: "NSPSW", name: "NSPSW" },
-            { label: "ZPD", name: "ZPD" },
-            { label: "IW [deg]", name: "IW" },
-            { label: "Thrust Coefficient (CTIP)", name: "CTIP" },
-            { label: "Propeller Location along Wing Span (y/b)", name: "propLocation" },
-            { label: "Propeller Diameter (D) [m]", name: "D" }
-          ].map(({ label, name }) => (
-            <div key={name}>
-              <label>{label}</label>
+  return (
+    <div className="prowim-container">
+      {/* Polar Data Panel */}
+      {renderPolarPanel()}
+
+      {/* Main Content */}
+      <div className={`prowim-main-content ${isPolarPanelOpen ? 'with-panel' : 'full-width'}`}>
+        <div className="model-viewer">
+          {!showPlots ? (
+            <Prowim3Dmodel
+              bOverD={parseFloat(formData.bOverD)}
+              cOverD={parseFloat(formData.cOverD)}
+              D={parseFloat(formData.D)}
+              propLocation={parseFloat(formData.propLocation)}
+            />
+          ) : (
+            <div className="plots-container">
+              <div className="plot-controls">
+                <button type="button" onClick={handleBackToModel} className="btn btn-secondary">
+                  Back to 3D Model
+                </button>
+              </div>
+              {clData && cdData && (
+                <div className="charts">
+                  <div className="chart">
+                    <h4>CL vs Angle of Attack</h4>
+                    <Line data={clData} options={chartOptions} />
+                  </div>
+                  <div className="chart">
+                    <h4>CD vs Angle of Attack</h4>
+                    <Line data={cdData} options={chartOptions} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="form-container">
+          <form onSubmit={handleSubmit}>
+            {[
+              { label: "Wing Aspect Ratio (A)", name: "A" },
+              { label: "b / D", name: "bOverD" },
+              { label: "c / D", name: "cOverD" },
+              { label: "Angle of attack at zero lift (α₀) [deg]", name: "alpha0" },
+              { label: "Total number of propellers (N)", name: "N" },
+              { label: "NSPSW", name: "NSPSW" },
+              { label: "ZPD", name: "ZPD" },
+              { label: "IW [deg]", name: "IW" },
+              { label: "Thrust Coefficient (CTIP)", name: "CTIP" },
+              { label: "Propeller Location along Wing Span (y/b)", name: "propLocation" },
+              { label: "Propeller Diameter (D) [m]", name: "D" }
+            ].map(({ label, name }) => (
+              <div key={name}>
+                <label>{label}</label>
+                <input
+                  type="number"
+                  step="any"
+                  name={name}
+                  value={formData[name]}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            ))}
+
+            {/* Array inputs */}
+            <div>
+              <label>ALFAWI [deg] {polarData && <span className="auto-filled-indicator">📊 Auto-filled</span>}</label>
               <input
-                type="number"
-                step="any"
-                name={name}
-                value={formData[name]}
-                onChange={handleChange}
+                type="text"
+                name="ALFAWI"
+                value={formData.ALFAWI}
+                onChange={(e) => handleArrayChange("ALFAWI", e.target.value)}
+                placeholder="0, 5, 10"
                 required
               />
+              <small>Current values: [{arrayInputs.ALFAWI.map(val => val.toFixed(2)).join(', ')}]</small>
             </div>
-          ))}
 
-          {/* Array inputs */}
-          <div>
-            <label>ALFAWI [deg]</label>
-            <input
-              type="text"
-              name="ALFAWI"
-              value={formData.ALFAWI}
-              onChange={(e) => handleArrayChange("ALFAWI", e.target.value)}
-              placeholder="0, 5, 10"
-              required
-            />
-            <small>Current values: [{arrayInputs.ALFAWI.map(val => val.toFixed(2)).join(', ')}]</small>
-          </div>
+            <div>
+              <label>CL0 {polarData && <span className="auto-filled-indicator">📊 Auto-filled</span>}</label>
+              <input
+                type="text"
+                name="CL0"
+                value={formData.CL0}
+                onChange={(e) => handleArrayChange("CL0", e.target.value)}
+                placeholder="0.5, 0.6, 0.7"
+                required
+              />
+              <small>Current values: [{arrayInputs.CL0.map(val => val.toFixed(3)).join(', ')}]</small>
+            </div>
 
-          <div>
-            <label>CL0</label>
-            <input
-              type="text"
-              name="CL0"
-              value={formData.CL0}
-              onChange={(e) => handleArrayChange("CL0", e.target.value)}
-              placeholder="0.5, 0.6, 0.7"
-              required
-            />
-            <small>Current values: [{arrayInputs.CL0.map(val => val.toFixed(3)).join(', ')}]</small>
-          </div>
+            <div>
+              <label>CD0 {polarData && <span className="auto-filled-indicator">📊 Auto-filled</span>}</label>
+              <input
+                type="text"
+                name="CD0"
+                value={formData.CD0}
+                onChange={(e) => handleArrayChange("CD0", e.target.value)}
+                placeholder="0.02, 0.025, 0.03"
+                required
+              />
+              <small>Current values: [{arrayInputs.CD0.map(val => val.toFixed(3)).join(', ')}]</small>
+            </div>
 
-          <div>
-            <label>CD0</label>
-            <input
-              type="text"
-              name="CD0"
-              value={formData.CD0}
-              onChange={(e) => handleArrayChange("CD0", e.target.value)}
-              placeholder="0.02, 0.025, 0.03"
-              required
-            />
-            <small>Current values: [{arrayInputs.CD0.map(val => val.toFixed(3)).join(', ')}]</small>
-          </div>
+            <div>
+              <label>KS00</label>
+              <input
+                type="text"
+                value={arrayInputs.KS00.join(', ')}
+                readOnly
+                style={{ backgroundColor: '#f5f5f5' }}
+              />
+            </div>
 
-          <div>
-            <label>KS00</label>
-            <input
-              type="text"
-              value={arrayInputs.KS00.join(', ')}
-              readOnly
-              style={{ backgroundColor: '#f5f5f5' }}
-            />
-          </div>
+            <label>Number of flap elements (NELMNT)</label>
+            <select name="NELMNT" value={formData.NELMNT} onChange={handleChange}>
+              <option value="0">Flaps Up</option>
+              <option value="1">Single Flap</option>
+              <option value="2">Double Flaps</option>
+            </select>
 
-          <label>Number of flap elements (NELMNT)</label>
-          <select name="NELMNT" value={formData.NELMNT} onChange={handleChange}>
-            <option value="0">Flaps Up</option>
-            <option value="1">Single Flap</option>
-            <option value="2">Double Flaps</option>
-          </select>
+            <button type="submit">Compute</button>
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/post-processing')}>
+              Back to Post-Processing
+            </button>
+          </form>
 
-          <button type="submit">Compute</button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>Back to Main Module</button>
-        </form>
-
-        {/* Results display */}
-        {result && Array.isArray(result) && (
-          <div className="results">
-            <h3>Computation Results</h3>
-            <div className="results-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Set</th>
-                    <th>ALFAWI</th>
-                    <th>KS00</th>
-                    <th>CL0</th>
-                    <th>CD0</th>
-                    <th>CL_Prop</th>
-                    <th>CD_Prop</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.map((res, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td>{arrayInputs.ALFAWI[index]?.toFixed(2) || 'N/A'}</td>
-                      <td>{arrayInputs.KS00[index]?.toFixed(4) || 'N/A'}</td>
-                      <td>{arrayInputs.CL0[index]?.toFixed(3) || 'N/A'}</td>
-                      <td>{arrayInputs.CD0[index]?.toFixed(4) || 'N/A'}</td>
-                      <td>{res.CZD?.toFixed(5) || 'N/A'}</td>
-                      <td>{res.CXD?.toFixed(5) || 'N/A'}</td>
+          {/* Results display */}
+          {result && Array.isArray(result) && (
+            <div className="results">
+              <h3>Computation Results</h3>
+              <div className="results-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Set</th>
+                      <th>ALFAWI</th>
+                      <th>KS00</th>
+                      <th>CL0</th>
+                      <th>CD0</th>
+                      <th>CL_Prop</th>
+                      <th>CD_Prop</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="plot-button-container">
-              <button type="button" onClick={handlePlotResults} className="btn btn-success">
-                Plot CL vs Alpha & CD vs Alpha
-              </button>
+                  </thead>
+                  <tbody>
+                    {result.map((res, index) => (
+                      <tr key={index}>
+                        <td>{index + 1}</td>
+                        <td>{arrayInputs.ALFAWI[index]?.toFixed(2) || 'N/A'}</td>
+                        <td>{arrayInputs.KS00[index]?.toFixed(4) || 'N/A'}</td>
+                        <td>{arrayInputs.CL0[index]?.toFixed(3) || 'N/A'}</td>
+                        <td>{arrayInputs.CD0[index]?.toFixed(4) || 'N/A'}</td>
+                        <td>{res.CZD?.toFixed(5) || 'N/A'}</td>
+                        <td>{res.CXD?.toFixed(5) || 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="plot-button-container">
+                <button type="button" onClick={handlePlotResults} className="btn btn-success">
+                  Plot CL vs Alpha & CD vs Alpha
+                </button>
 
-              <select onChange={handleExportDropdown} className="btn btn-info export-dropdown">
-                <option value="">Export Results</option>
-                <option value="csv">Export as CSV</option>
-                <option value="txt">Export as TXT</option>
-              </select>
+                <select onChange={handleExportDropdown} className="btn btn-info export-dropdown">
+                  <option value="">Export Results</option>
+                  <option value="csv">Export as CSV</option>
+                  <option value="txt">Export as TXT</option>
+                </select>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

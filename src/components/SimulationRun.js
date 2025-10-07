@@ -29,7 +29,7 @@ ChartJS.register(
   Legend
 );
 
-const SimulationRunPage = () => {
+const SimulationRun = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
@@ -38,6 +38,7 @@ const SimulationRunPage = () => {
     iterations: [],
     residuals: [],
   });
+  const [simulationName, setSimulationName] = useState(""); // Store simulation name locally
   const { formData } = useContext(FormDataContext);
   const messageBoxRef = useRef(null);
 
@@ -69,11 +70,20 @@ const SimulationRunPage = () => {
       return;
     }
 
-    const newSocket = io("http://127.0.0.1:5000");
+    const newSocket = io("http://127.0.0.1:5000", {
+      pingTimeout: 300000,  // 5 minutes
+      pingInterval: 60000   // 1 minute
+    });
 
     newSocket.on("connect", () => {
       console.log("WebSocket connected");
       const formObject = Object.fromEntries(formData.entries());
+
+      // Store simulation name locally for later use
+      const simName = formObject.simName;
+      setSimulationName(simName);
+      console.log("Stored simulation name:", simName);
+
       newSocket.emit("start_simulation", formObject);
     });
 
@@ -97,6 +107,31 @@ const SimulationRunPage = () => {
       }
     });
 
+    newSocket.on("simulation_folder_ready", (folderData) => {
+      console.log("Simulation folder data received:", folderData);
+
+      if (folderData && folderData.success) {
+        // Navigate to post processing with the folder data
+        navigate('/post-processing', {
+          state: {
+            simulationFolder: folderData.data,
+            simName: folderData.simName
+          }
+        });
+      } else {
+        console.error('Failed to get simulation folder data:', folderData?.error || 'Unknown error');
+        alert('Failed to export simulation data. Please try again.');
+      }
+    });
+
+    // Handle errors from socket events
+    newSocket.on("error", (errorData) => {
+      console.error("Socket error:", errorData);
+      if (errorData.type === 'simulation_folder_error') {
+        alert('Error exporting simulation data: ' + (errorData.message || 'Unknown error'));
+      }
+    });
+
     newSocket.on("disconnect", () => {
       console.log("WebSocket disconnected");
     });
@@ -107,7 +142,7 @@ const SimulationRunPage = () => {
       newSocket.disconnect();
       console.log("WebSocket cleanup: Disconnected on component unmount");
     };
-  }, [formData]);
+  }, [formData, navigate]);
 
   useEffect(() => {
     if (messageBoxRef.current) {
@@ -116,66 +151,32 @@ const SimulationRunPage = () => {
   }, [messages]);
 
   const handleDownload = () => {
-    if (!formData) {
-      console.error("Error: No form data available in SimulationRun component.");
-      return;
-    }
-
-    const formObject = Object.fromEntries(formData.entries());
-    const simName = formObject.simName;
-
-    if (!simName) {
-      console.error("Error: Simulation name is missing in form data.");
+    if (!simulationName) {
+      console.error("Error: Simulation name not available.");
+      alert("Simulation name not available. Please restart the simulation.");
       return;
     }
 
     if (socket) {
-      socket.emit("download", { simName });
+      socket.emit("download", { simName: simulationName });
       console.log("Download request sent via WebSocket");
     }
   };
 
-  const handleExportToVFPPost = async () => {
-    if (!formData) {
-      console.error("Error: No form data available in SimulationRun component.");
+  const handleExportToVFPPost = () => {
+    if (!simulationName) {
+      console.error("Error: Simulation name not available.");
+      alert("Simulation name not available. Please restart the simulation.");
       return;
     }
 
-    const formObject = Object.fromEntries(formData.entries());
-    const simName = formObject.simName;
-
-    if (!simName) {
-      console.error("Error: Simulation name is missing in form data.");
-      return;
-    }
-
-    try {
-      // Request simulation folder data from server
-      const response = await fetch('http://127.0.0.1:5000/get-simulation-folder', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ simName }),
-      });
-
-      if (response.ok) {
-        const folderData = await response.json();
-
-        // Navigate to post processing with the folder data
-        navigate('/post-processing', {
-          state: {
-            simulationFolder: folderData,
-            simName: simName
-          }
-        });
-      } else {
-        console.error('Failed to get simulation folder data');
-        alert('Failed to export simulation data. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error exporting to VFP Post:', error);
-      alert('Error exporting simulation data. Please try again.');
+    if (socket) {
+      console.log("Requesting simulation folder via WebSocket for:", simulationName);
+      // Emit socket request to get simulation folder data
+      socket.emit("get_simulation_folder", { simName: simulationName });
+    } else {
+      console.error("Socket connection not available");
+      alert('Connection error. Please try again.');
     }
   };
 
@@ -194,8 +195,8 @@ const SimulationRunPage = () => {
       {
         label: "Residuals",
         data: residualData.residuals,
-        borderColor: "rgba(255, 70, 70, 1)",
-        backgroundColor: "rgba(75, 192, 192, 0.2)",
+        borderColor: "rgba(243, 33, 33, 1)", // Blue theme
+        backgroundColor: "rgba(33, 150, 243, 0.1)", // Blue theme
         tension: 0.1,
         pointRadius: 2,
         pointHoverRadius: 4,
@@ -209,10 +210,14 @@ const SimulationRunPage = () => {
     plugins: {
       legend: {
         position: "top",
+        labels: {
+          color: "#1565c0", // Blue theme
+        },
       },
       title: {
         display: true,
         text: "Residuals vs Iterations",
+        color: "#1565c0", // Blue theme
       },
     },
     scales: {
@@ -221,6 +226,13 @@ const SimulationRunPage = () => {
         title: {
           display: true,
           text: "Iterations",
+          color: "#1565c0", // Blue theme
+        },
+        ticks: {
+          color: "#1976d2", // Blue theme
+        },
+        grid: {
+          color: "rgba(33, 150, 243, 0.1)", // Blue theme
         },
       },
       y: {
@@ -228,9 +240,31 @@ const SimulationRunPage = () => {
         title: {
           display: true,
           text: "Residuals",
+          color: "#1565c0", // Blue theme
         },
-        type: "logarithmic",
-        min: 1e-10, // Set minimum value for log scale
+        type: "linear",
+        min: 1e-15, // Set minimum value for log scale
+        ticks: {
+          color: "#1976d2", // Blue theme
+          callback: function (value, index, ticks) {
+            // Format numbers in scientific notation with 4 decimal places
+            if (value === 0) return '0.0000E+0';
+
+            const exponent = Math.floor(Math.log10(Math.abs(value)));
+            const mantissa = value / Math.pow(10, exponent);
+
+            // Format mantissa to 4 decimal places
+            const formattedMantissa = mantissa.toFixed(4);
+
+            // Format exponent with proper sign
+            const formattedExponent = exponent >= 0 ? `+${exponent}` : `${exponent}`;
+
+            return `${formattedMantissa}E${formattedExponent}`;
+          }
+        },
+        grid: {
+          color: "rgba(33, 150, 243, 0.1)", // Blue theme
+        },
       },
     },
     animation: {
@@ -241,7 +275,7 @@ const SimulationRunPage = () => {
   return (
     <div className="simulation-page-container">
       <div className="simulation-header">
-        <h1>VFP Simulation Running</h1>
+        <h1>VFP Simulation Running - {simulationName}</h1>
         <div className="header-buttons">
           <button onClick={handleDownload} className="download-button">
             Download Files
@@ -282,4 +316,4 @@ const SimulationRunPage = () => {
   );
 };
 
-export default SimulationRunPage;
+export default SimulationRun;

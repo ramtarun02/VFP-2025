@@ -378,6 +378,188 @@ form button:hover {
   background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
 }
 
+/* Add these styles to your existing ProWiM.css file */
+
+.prowim-container {
+  display: flex;
+  height: 100vh;
+  position: relative;
+}
+
+.polar-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  background-color: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  transition: width 0.3s ease;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.polar-panel.open {
+  width: 300px;
+}
+
+.polar-panel.closed {
+  width: 40px;
+}
+
+.polar-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: #e9ecef;
+  border-bottom: 1px solid #dee2e6;
+  min-height: 60px;
+}
+
+.polar-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #495057;
+}
+
+.polar-panel.closed .polar-panel-header h3 {
+  display: none;
+}
+
+.toggle-polar-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 5px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.toggle-polar-btn:hover {
+  background-color: #dee2e6;
+}
+
+.polar-panel-content {
+  padding: 15px;
+}
+
+.no-polars-message {
+  text-align: center;
+  color: #6c757d;
+  padding: 20px 0;
+}
+
+.no-polars-message p {
+  margin: 0 0 5px 0;
+  font-weight: 500;
+}
+
+.no-polars-message small {
+  font-size: 12px;
+  color: #9e9e9e;
+}
+
+.csv-files-list h4 {
+  margin: 0 0 15px 0;
+  font-size: 14px;
+  color: #495057;
+}
+
+.csv-file-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 5px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: white;
+}
+
+.csv-file-item:hover {
+  background-color: #f8f9fa;
+  border-color: #007bff;
+}
+
+.csv-file-item.selected {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+}
+
+.csv-file-item .file-icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.csv-file-item .file-name {
+  flex: 1;
+  font-size: 13px;
+  color: #495057;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.csv-file-item .selected-indicator {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.polar-data-info {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #e8f5e8;
+  border-radius: 4px;
+  border: 1px solid #c3e6c3;
+}
+
+.polar-data-info h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #155724;
+}
+
+.polar-data-info p {
+  margin: 5px 0;
+  font-size: 12px;
+  color: #155724;
+}
+
+.prowim-main-content {
+  display: flex;
+  flex: 1;
+  transition: margin-left 0.3s ease;
+}
+
+.prowim-main-content.with-panel {
+  margin-left: 300px;
+}
+
+.prowim-main-content.full-width {
+  margin-left: 40px;
+}
+
+.auto-filled-indicator {
+  color: #28a745;
+  font-size: 12px;
+  margin-left: 5px;
+  font-weight: normal;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .polar-panel.open {
+    width: 250px;
+  }
+
+  .prowim-main-content.with-panel {
+    margin-left: 250px;
+  }
+}
+
 /* Responsive design for button container */
 @media (max-width: 768px) {
   .plot-button-container {

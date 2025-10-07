@@ -19,7 +19,7 @@ function App() {
         <Route path="/run-solver" element={<RunSolver />} />
         <Route path="/results" element={<Solver />} />
         <Route path="/post-processing" element={<PostProcessing />} />
-        <Route path="/propeller-wing-form" element={<ProWiM />} />
+        <Route path="/post-processing/prowim" element={<ProWiM />} />
         <Route path="/simulation-run" element={<SimulationRun />} />
       </Routes>
     </FormDataProvider>

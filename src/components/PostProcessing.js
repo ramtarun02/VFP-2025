@@ -7,7 +7,7 @@ function PostProcessing() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isExplorerOpen, setIsExplorerOpen] = useState(true);
-  const [explorerWidth, setExplorerWidth] = useState(300); // Default width
+  const [explorerWidth, setExplorerWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const [simulationData, setSimulationData] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState({
@@ -29,11 +29,11 @@ function PostProcessing() {
   const [showMesh, setShowMesh] = useState(false);
   const resizeRef = useRef(null);
 
-  // Coefficients data (will be populated from .forces file)
+  // Coefficients data
   const [coefficients, setCoefficients] = useState({
-    CL: 0.201594,
-    CD: 0.024548,
-    CM: -0.120984
+    CL: 0.000000,
+    CD: 0.000000,
+    CM: -0.000000
   });
 
   const [dragBreakdown, setDragBreakdown] = useState({
@@ -42,10 +42,138 @@ function PostProcessing() {
     cdWave: 0.000
   });
 
-  // Check if we received simulation data from SimulationRun page
+  // Debug simulation data structure
+  const debugSimulationData = (data) => {
+    console.log('Debug - Simulation Data Structure:', {
+      hasData: !!data,
+      keys: data ? Object.keys(data) : [],
+      fullData: data,
+      filesType: data?.files ? typeof data.files : 'undefined',
+      filesKeys: data?.files ? Object.keys(data.files) : [],
+      filesIsArray: Array.isArray(data?.files),
+      sampleFile: data?.files ? (Array.isArray(data.files) ? data.files[0] : Object.values(data.files).flat()[0]) : null
+    });
+  };
+
+  // Convert files array to expected object structure
+  const convertFilesArrayToObject = (filesArray) => {
+    const fileTypes = {
+      dat: [],
+      cp: [],
+      forces: [],
+      geo: [],
+      map: [],
+      txt: [],
+      log: [],
+      other: []
+    };
+
+    if (!Array.isArray(filesArray)) {
+      console.log('Files is not an array:', filesArray);
+      return fileTypes;
+    }
+
+    filesArray.forEach(file => {
+      if (!file || !file.name) {
+        console.log('Invalid file object:', file);
+        return;
+      }
+
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'other';
+      console.log(`Processing file: ${file.name}, extension: ${ext}`);
+
+      if (fileTypes[ext]) {
+        fileTypes[ext].push(file);
+      } else {
+        fileTypes.other.push(file);
+      }
+    });
+
+    // Sort each type alphabetically
+    Object.keys(fileTypes).forEach(type => {
+      fileTypes[type].sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`${type} files:`, fileTypes[type].length);
+    });
+
+    return fileTypes;
+  };
+
+  // Fetch file content from server
+  const fetchServerFile = async (file) => {
+    try {
+      console.log('Fetching server file:', file);
+
+      const simName = simulationData?.simName || 'unknown';
+      console.log('Using simulation name:', simName);
+      console.log('File path:', file.path);
+
+      const response = await fetch(`http://127.0.0.1:5000/get_file_content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          simName: simName,
+          filePath: file.path || file.name
+        })
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const content = await response.text();
+      console.log('File content fetched successfully, length:', content.length);
+      return content;
+
+    } catch (error) {
+      console.error('Error fetching file content:', error);
+
+      if (error.message.includes('Failed to fetch')) {
+        alert(`Network error loading file ${file.name}. Please check if the backend server is running on http://127.0.0.1:5000`);
+      } else if (error.message.includes('404')) {
+        alert(`File ${file.name} not found on server.`);
+      } else {
+        alert(`Error loading file ${file.name}: ${error.message}`);
+      }
+      return null;
+    }
+  };
+
+  // Process simulation data on component mount
   useEffect(() => {
+    console.log('Location state received:', location.state);
+
     if (location.state && location.state.simulationFolder) {
-      setSimulationData(location.state.simulationFolder);
+      console.log('Raw simulation folder data:', location.state.simulationFolder);
+
+      const receivedData = location.state.simulationFolder;
+      let finalData = null;
+
+      if (receivedData.data) {
+        console.log('Processing server socket data:', receivedData.data);
+        finalData = receivedData.data;
+      } else {
+        console.log('Processing direct data:', receivedData);
+        finalData = receivedData;
+      }
+
+      debugSimulationData(finalData);
+
+      if (finalData && Array.isArray(finalData.files)) {
+        console.log('Converting files array to object structure');
+        finalData = {
+          ...finalData,
+          files: convertFilesArrayToObject(finalData.files)
+        };
+        console.log('Converted data:', finalData);
+      }
+
+      setSimulationData(finalData);
     }
   }, [location.state]);
 
@@ -61,8 +189,6 @@ function PostProcessing() {
           data: section
         }));
         setSections(sectionOptions);
-
-        // Reset selected section when level changes
         setSelectedSection('');
       } else {
         setSections([]);
@@ -74,7 +200,7 @@ function PostProcessing() {
     }
   }, [parsedCpData, selectedLevel]);
 
-  // Plot data when selections change
+  // Generate plots when selections change
   useEffect(() => {
     if (selectedLevel && selectedPlotType && selectedSection && parsedCpData && !showMesh) {
       generatePlotData();
@@ -89,9 +215,8 @@ function PostProcessing() {
 
   const handleMouseMove = useCallback((e) => {
     if (!isResizing) return;
-
     const newWidth = e.clientX;
-    if (newWidth >= 200 && newWidth <= 600) { // Min and max width constraints
+    if (newWidth >= 200 && newWidth <= 600) {
       setExplorerWidth(newWidth);
     }
   }, [isResizing]);
@@ -121,23 +246,31 @@ function PostProcessing() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  // Import folder handler
   const handleImportFolder = () => {
-    // Create a hidden input element for folder selection
     const input = document.createElement('input');
     input.type = 'file';
-    input.webkitdirectory = true; // This allows folder selection
+    input.webkitdirectory = true;
     input.multiple = true;
 
     input.onchange = (event) => {
       const files = Array.from(event.target.files);
       if (files.length > 0) {
-        // Process the selected folder
         const folderStructure = processFolderFiles(files);
         setSimulationData(folderStructure);
       }
     };
 
     input.click();
+  };
+
+  // Navigate to ProWim handler
+  const handleNavigateToProWim = () => {
+    navigate('/post-processing/prowim', {
+      state: {
+        simulationFolder: simulationData
+      }
+    });
   };
 
   const processFolderFiles = (fileList) => {
@@ -147,13 +280,10 @@ function PostProcessing() {
       size: file.size,
       modified: file.lastModified,
       isDirectory: false,
-      file: file // Keep reference to actual file
+      file: file
     }));
 
-    // Sort files by type
     const sortedFiles = sortFilesByType(files);
-
-    // Extract folder name from the first file's path
     const folderName = files[0]?.path.split('/')[0] || 'Imported Folder';
 
     return {
@@ -176,7 +306,7 @@ function PostProcessing() {
     };
 
     files.forEach(file => {
-      const ext = file.name.split('.').pop().toLowerCase();
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'other';
       if (fileTypes[ext]) {
         fileTypes[ext].push(file);
       } else {
@@ -184,7 +314,6 @@ function PostProcessing() {
       }
     });
 
-    // Sort each type alphabetically
     Object.keys(fileTypes).forEach(type => {
       fileTypes[type].sort((a, b) => a.name.localeCompare(b.name));
     });
@@ -192,8 +321,12 @@ function PostProcessing() {
     return fileTypes;
   };
 
+  // File selection handler
   const handleFileSelect = (file) => {
+    console.log('File selected:', file);
+
     const ext = file.name.split('.').pop().toLowerCase();
+    console.log('File extension:', ext);
 
     if (['dat', 'cp', 'forces'].includes(ext)) {
       setSelectedFiles(prev => ({
@@ -201,33 +334,83 @@ function PostProcessing() {
         [ext]: file
       }));
 
-      // If a .dat file is selected, parse it for levels
       if (ext === 'dat') {
-        // Clear existing levels when selecting a different dat file
-        setLevels([]);
         setParsedDatData(null);
         setSelectedLevel('');
 
-        parseDatFile(file.file);
+        if (file.file) {
+          console.log('Processing DAT file from folder import');
+          parseDatFile(file.file);
+        } else {
+          console.log('Processing DAT file from server');
+          fetchServerFile(file).then(content => {
+            if (content) {
+              try {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const fileObj = new File([blob], file.name, { type: 'text/plain' });
+                parseDatFile(fileObj);
+              } catch (error) {
+                console.error('Error creating file object for DAT:', error);
+                alert(`Error processing DAT file: ${error.message}`);
+              }
+            }
+          }).catch(error => {
+            console.error('Error in DAT file fetch promise:', error);
+          });
+        }
       }
 
-      // If a .cp file is selected, parse it
       if (ext === 'cp') {
-        // Clear existing cp data when selecting a different cp file
         setParsedCpData(null);
         setSections([]);
         setSelectedLevel('');
         setSelectedSection('');
 
-        parseCpFile(file.file);
+        if (file.file) {
+          console.log('Processing CP file from folder import');
+          parseCpFile(file.file);
+        } else {
+          console.log('Processing CP file from server');
+          fetchServerFile(file).then(content => {
+            if (content) {
+              try {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const fileObj = new File([blob], file.name, { type: 'text/plain' });
+                parseCpFile(fileObj);
+              } catch (error) {
+                console.error('Error creating file object for CP:', error);
+                alert(`Error processing CP file: ${error.message}`);
+              }
+            }
+          }).catch(error => {
+            console.error('Error in CP file fetch promise:', error);
+          });
+        }
       }
 
-      // If a .forces file is selected, parse it
       if (ext === 'forces') {
-        // Clear existing forces data when selecting a different forces file
         setParsedForcesData(null);
 
-        parseForcesFile(file.file);
+        if (file.file) {
+          console.log('Processing Forces file from folder import');
+          parseForcesFile(file.file);
+        } else {
+          console.log('Processing Forces file from server');
+          fetchServerFile(file).then(content => {
+            if (content) {
+              try {
+                const blob = new Blob([content], { type: 'text/plain' });
+                const fileObj = new File([blob], file.name, { type: 'text/plain' });
+                parseForcesFile(fileObj);
+              } catch (error) {
+                console.error('Error creating file object for Forces:', error);
+                alert(`Error processing Forces file: ${error.message}`);
+              }
+            }
+          }).catch(error => {
+            console.error('Error in Forces file fetch promise:', error);
+          });
+        }
       }
     }
   };
@@ -241,7 +424,7 @@ function PostProcessing() {
     });
   };
 
-  // Handle mesh button click
+  // Mesh button handler
   const handleMeshClick = () => {
     if (!parsedCpData || !selectedLevel || !parsedForcesData) {
       alert('Please select CP and Forces files and choose a level first.');
@@ -249,16 +432,13 @@ function PostProcessing() {
     }
 
     if (showMesh) {
-      // If mesh is currently shown, hide it and show regular plots
       setShowMesh(false);
       setMeshData(null);
     } else {
-      // Generate mesh data and show it
       generateMeshData();
       setShowMesh(true);
     }
   };
-
 
   // Generate mesh data
   const generateMeshData = () => {
@@ -287,18 +467,22 @@ function PostProcessing() {
       return;
     }
 
-    // Get forces data for the selected level
-    const forcesLevel = parsedForcesData.levels.find(l => l.level === parseInt(selectedLevel));
-    console.log('Forces level:', forcesLevel);
+    // Get the actual level number from the CP data
+    const actualLevelMatch = level.flowParameters.match(/LEV=\s*(\d+)/);
+    const actualLevelNumber = actualLevelMatch ? parseInt(actualLevelMatch[1]) : parseInt(selectedLevel);
+    console.log('Actual level number from CP file:', actualLevelNumber);
+
+    // Get forces data for the actual level number
+    const forcesLevel = parsedForcesData.levels.find(l => l.level === actualLevelNumber);
+    console.log('Forces level found:', forcesLevel);
 
     if (!forcesLevel) {
-      console.log('No matching forces level found for level:', selectedLevel);
+      console.log('No matching forces level found for actual level:', actualLevelNumber);
       return;
     }
 
     console.log('Processing sections for mesh...');
 
-    // Arrays to store all mesh lines
     const meshLines = [];
     const allX = [];
     const allY = [];
@@ -333,10 +517,10 @@ function PostProcessing() {
       mainTable.forEach((row, rowIndex) => {
         if (row.length >= 2) {
           // Use X/C and Z/C from columns 0 and 1
-          const xCoord = typeof row[8] === 'number' ? row[8] : 0;
-          const zCoord = typeof row[9] === 'number' ? row[9] : 0;
+          const xCoord = typeof row[0] === 'number' ? row[0] : 0;
+          const zCoord = typeof row[1] === 'number' ? row[1] : 0;
 
-          if (rowIndex < 3) { // Log first few rows for debugging
+          if (rowIndex < 3) {
             console.log(`Section ${sectionIndex + 1}, Row ${rowIndex}:`, {
               xCoord: xCoord,
               zCoord: zCoord,
@@ -348,7 +532,6 @@ function PostProcessing() {
           sectionY.push(yave);
           sectionZ.push(zCoord);
 
-          // Add to overall arrays
           allX.push(xCoord);
           allY.push(yave);
           allZ.push(zCoord);
@@ -362,7 +545,7 @@ function PostProcessing() {
         yValue: yave
       });
 
-      // Create chordwise lines (connecting points along the chord at this section)
+      // Create chordwise lines
       if (sectionX.length > 1) {
         for (let i = 0; i < sectionX.length - 1; i++) {
           meshLines.push({
@@ -379,11 +562,10 @@ function PostProcessing() {
       }
     });
 
-    // Create spanwise lines (connecting corresponding points between sections)
+    // Create spanwise lines
     console.log('Creating spanwise lines...');
     const sectionsData = [];
 
-    // Collect all section data
     sections.forEach((section, sectionIndex) => {
       const mainTable = section.mainTable;
       if (!mainTable || mainTable.length === 0) return;
@@ -394,9 +576,9 @@ function PostProcessing() {
       }
 
       const sectionPoints = mainTable.map(row => ({
-        x: typeof row[8] === 'number' ? row[8] : 0,
+        x: typeof row[0] === 'number' ? row[0] : 0,
         y: yave,
-        z: typeof row[9] === 'number' ? row[9] : 0
+        z: typeof row[1] === 'number' ? row[1] : 0
       }));
 
       sectionsData.push(sectionPoints);
@@ -439,11 +621,10 @@ function PostProcessing() {
       return;
     }
 
-    // Create the mesh plot data with wireframe lines
     const meshPlotData = {
       data: meshLines,
       layout: {
-        title: 'CFD Mesh Visualization',
+        title: `CFD Mesh Visualization - Level ${actualLevelNumber}`,
         scene: {
           xaxis: {
             title: 'X/C',
@@ -478,8 +659,7 @@ function PostProcessing() {
     setMeshData(meshPlotData);
   };
 
-
-  // Generate plot data for Plotly
+  // Generate 2D plot data
   const generatePlotData = () => {
     if (!parsedCpData || !selectedLevel || !selectedSection) return;
 
@@ -491,10 +671,7 @@ function PostProcessing() {
 
     const section = parsedCpData.levels[levelIndex].sections[sectionIndex];
 
-    // Generate Plot 1 data: CP vs X/C or Mach vs X/C
     generatePlot1Data(section);
-
-    // Generate Plot 2 data: Z/C vs X/C
     generatePlot2Data(section);
   };
 
@@ -505,7 +682,6 @@ function PostProcessing() {
       return;
     }
 
-    // Extract X/C (column 0), CP (column 2), and Mach (column 4) values
     const xValues = data.map(row => row[0]).filter(val => typeof val === 'number');
     const yValues = selectedPlotType === 'Cp'
       ? data.map(row => row[2]).filter(val => typeof val === 'number')
@@ -567,7 +743,6 @@ function PostProcessing() {
       return;
     }
 
-    // Extract X/C (column 0) and Z/C (column 1) values
     const xValues = data.map(row => row[0]).filter(val => typeof val === 'number');
     const zValues = data.map(row => row[1]).filter(val => typeof val === 'number');
 
@@ -617,7 +792,7 @@ function PostProcessing() {
     });
   };
 
-  // Function to parse .cp file according to the specific structure
+  // Parse CP file
   const parseCpFile = async (file) => {
     try {
       const content = await parseFileContent(file);
@@ -650,14 +825,13 @@ function PostProcessing() {
       while (lineIndex < lines.length) {
         const line = lines[lineIndex].trim();
 
-        // Check for level header line (starts with LEV=)
-        if (line.startsWith('LEV=')) {
+        if (line.startsWith('LEV= ')) {
           const level = {
             flowParameters: line,
             sections: []
           };
 
-          lineIndex++; // Move to next line after level header
+          lineIndex++;
 
           // Parse sections within this level
           while (lineIndex < lines.length) {
@@ -672,11 +846,11 @@ function PostProcessing() {
 
             // Check if we've reached the next level
             if (sectionLine.startsWith('LEV=')) {
-              lineIndex--; // Step back to process this line in outer loop
+              lineIndex--;
               break;
             }
 
-            // Check for section header (starts with "J = ")
+            // Check for section header
             if (sectionLine.startsWith('J=')) {
               const section = {
                 sectionHeader: sectionLine,
@@ -684,32 +858,28 @@ function PostProcessing() {
                 vortexSheetTable: []
               };
 
-              lineIndex++; // Move past section header
+              lineIndex++;
 
               // Skip empty lines until we reach the main table
               while (lineIndex < lines.length && !lines[lineIndex].trim()) {
                 lineIndex++;
               }
 
-              // Read main table data (space delimited values until empty line)
+              // Read main table data
               while (lineIndex < lines.length) {
                 const dataLine = lines[lineIndex].trim();
 
-                // Stop at empty line (indicates end of main table)
                 if (!dataLine) {
                   break;
                 }
 
-                // Check if we've reached next section or level
-                if (dataLine.startsWith('J=') || dataLine.startsWith('LEV=')) {
-                  lineIndex--; // Step back to process this line in outer loop
+                if (dataLine.startsWith('J= ') || dataLine.startsWith('LEV= ')) {
+                  lineIndex--;
                   break;
                 }
 
-                // Parse the data line (space delimited values)
                 const values = dataLine.split(/\s+/);
                 if (values.length > 0) {
-                  // Convert numeric values
                   const parsedValues = values.map(value => {
                     const numValue = parseFloat(value);
                     return isNaN(numValue) ? value : numValue;
@@ -725,26 +895,22 @@ function PostProcessing() {
                 lineIndex++;
               }
 
-              // Read vortex sheet table data (space delimited values until next section)
+              // Read vortex sheet table data
               while (lineIndex < lines.length) {
                 const vortexDataLine = lines[lineIndex].trim();
 
-                // Stop if we've reached next section or level
-                if (vortexDataLine.startsWith('J=') || vortexDataLine.startsWith('LEV=')) {
-                  lineIndex--; // Step back to process this line in outer loop
+                if (vortexDataLine.startsWith('J= ') || vortexDataLine.startsWith('LEV= ')) {
+                  lineIndex--;
                   break;
                 }
 
-                // Skip empty lines
                 if (!vortexDataLine) {
                   lineIndex++;
                   continue;
                 }
 
-                // Parse the vortex sheet data line (space delimited values)
                 const vortexValues = vortexDataLine.split(/\s+/);
                 if (vortexValues.length > 0) {
-                  // Convert numeric values
                   const parsedVortexValues = vortexValues.map(value => {
                     const numValue = parseFloat(value);
                     return isNaN(numValue) ? value : numValue;
@@ -755,15 +921,12 @@ function PostProcessing() {
                 lineIndex++;
               }
 
-              // Add the completed section to the level
               level.sections.push(section);
             } else {
-              // Not a section header, move to next line
               lineIndex++;
             }
           }
 
-          // Add the completed level to cpData
           cpData.levels.push(level);
         } else {
           lineIndex++;
@@ -772,7 +935,24 @@ function PostProcessing() {
 
       setParsedCpData(cpData);
 
-      // Log the complete CP file JSON structure
+      // Create level options from CP file data
+      if (cpData.levels.length > 0) {
+        const levelOptions = cpData.levels.map((level, index) => {
+          const levelMatch = level.flowParameters.match(/LEV=\s*(\d+)/);
+          const levelNumber = levelMatch ? parseInt(levelMatch[1]) : index + 1;
+
+          return {
+            value: index + 1,
+            label: `Level ${levelNumber}`,
+            actualLevelNumber: levelNumber,
+            data: level
+          };
+        });
+
+        setLevels(levelOptions);
+        console.log('Set levels from CP file:', levelOptions);
+      }
+
       console.log('Parsed CP file JSON:', cpData);
 
     } catch (error) {
@@ -780,7 +960,7 @@ function PostProcessing() {
     }
   };
 
-  // Function to extract levels and fuse data from .dat file (proper parsing)
+  // Parse DAT file
   const extractLevelsAndFuse = (content) => {
     const lines = content.split('\n');
     const result = {
@@ -831,21 +1011,19 @@ function PostProcessing() {
     while (lineIndex < lines.length) {
       const line = lines[lineIndex].trim();
 
-      // Check if line starts with '2' followed by 20 digits
       const levelMatch = line.match(/^2\s+(\d{20})/);
       if (levelMatch) {
         levelCount++;
         const twentyDigitNumber = levelMatch[1];
-        const levelNumber = parseInt(twentyDigitNumber.charAt(1)); // Second digit is level number
+        const levelNumber = parseInt(twentyDigitNumber.charAt(1));
 
         const levelKey = `level${levelCount}`;
         result.levels[levelKey] = [];
 
-        // Add the current line to this level
         result.levels[levelKey].push(line + '\n');
         lineIndex++;
 
-        // Read next 15 lines for this level
+        // Read next 14 lines for this level
         for (let i = 0; i < 14 && lineIndex < lines.length; i++) {
           const levelLine = lines[lineIndex];
           if (levelLine !== undefined) {
@@ -868,21 +1046,7 @@ function PostProcessing() {
 
       setParsedDatData(extractedData);
 
-      // Create level options for dropdowns based on .dat file
-      const levelKeys = Object.keys(extractedData.levels);
-      let levelOptions = [];
-
-      if (levelKeys.length > 0) {
-        levelOptions = levelKeys.map((key, index) => ({
-          value: index + 1,
-          label: `${file.name.replace('.dat', '')}_L${index + 1}`,
-          data: extractedData.levels[key]
-        }));
-      }
-
-      setLevels(levelOptions);
-
-      // Log the complete JSON structure
+      // Don't set levels from DAT file anymore - CP file will handle this
       console.log('Parsed DAT file JSON:', extractedData);
 
     } catch (error) {
@@ -890,6 +1054,7 @@ function PostProcessing() {
     }
   };
 
+  // Parse Forces file
   const parseViscousDragData = (lines, startIndex) => {
     const viscousData = {
       header: lines[startIndex],
@@ -899,7 +1064,6 @@ function PostProcessing() {
       totalViscousDragTE: null
     };
 
-    // Find the column headers line
     let headerIndex = startIndex + 1;
     while (headerIndex < lines.length && !lines[headerIndex].trim().includes('THETA')) {
       headerIndex++;
@@ -909,11 +1073,9 @@ function PostProcessing() {
       const headerLine = lines[headerIndex].trim();
       viscousData.columns = headerLine.split(/\s+/);
 
-      // Parse data rows
       for (let i = headerIndex + 1; i < lines.length; i++) {
         const line = lines[i].trim();
 
-        // Check for total viscous drag values
         if (line.includes('Total viscous drag =')) {
           const match = line.match(/Total viscous drag\s*=\s*([\d.-]+)/);
           if (match) {
@@ -979,7 +1141,6 @@ function PostProcessing() {
     if (headerIndex < lines.length) {
       const columns = ['J', 'YAVE', 'YAVE/YTIP', 'TWIST(deg)', 'CHORD', 'CL', 'CD', 'CM', 'GAM', 'NLEPOS'];
 
-      // Parse data rows
       for (let i = headerIndex + 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line || line.includes('CLTOT') || line.includes('LEV=')) break;
@@ -999,7 +1160,6 @@ function PostProcessing() {
     for (let i = headerIndex; i < lines.length; i++) {
       const line = lines[i].trim();
 
-      // VFP Coefficients with wing area
       if (line.includes('CLTOT(VFP)')) {
         const clMatch = line.match(/CLTOT\(VFP\)=\s*([\d.-]+)/);
         const cdMatch = line.match(/CDTOT\(VFP\)=\s*([\d.-]+)/);
@@ -1013,13 +1173,10 @@ function PostProcessing() {
         };
 
         level.wingArea = areaMatch ? parseFloat(areaMatch[1]) : null;
-
-        // Also set the main coefficients for backward compatibility
         level.coefficients = level.vfpCoefficients;
         continue;
       }
 
-      // IBE Coefficients
       if (line.includes('CLTOT(IBE)')) {
         const clMatch = line.match(/CLTOT\(IBE\)=\s*([\d.-]+)/);
         const cdMatch = line.match(/CDTOT\(IBE\)=\s*([\d.-]+)/);
@@ -1031,7 +1188,6 @@ function PostProcessing() {
         continue;
       }
 
-      // Vortex Coefficients
       if (line.includes('CL(vortd)')) {
         const clMatch = line.match(/CL\(vortd\)\s*=\s*([\d.-]+)/);
         const cdMatch = line.match(/CD\(vortd\)\s*=\s*([\d.-]+)/);
@@ -1075,7 +1231,6 @@ function PostProcessing() {
         }
       };
 
-      // Parse each level
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         if (line.includes('LEV=')) {
@@ -1088,26 +1243,23 @@ function PostProcessing() {
 
       setParsedForcesData(forcesData);
 
-      // Update coefficients and drag breakdown with the last level's data
+      // Update coefficients with the last level's data
       if (forcesData.levels.length > 0) {
         const lastLevel = forcesData.levels[forcesData.levels.length - 1];
 
-        // Update main coefficients
         if (lastLevel.coefficients) {
           setCoefficients(lastLevel.coefficients);
         }
 
-        // Update drag breakdown
         const newDragBreakdown = {
           cdInduced: lastLevel.vortexCoefficients?.CD || 0.000,
           cdViscous: lastLevel.viscousDragData?.totalViscousDrag || 0.000,
-          cdWave: 0.000 // This might need to be calculated or found elsewhere
+          cdWave: 0.000
         };
 
         setDragBreakdown(newDragBreakdown);
       }
 
-      // Log the complete forces JSON structure
       console.log('Parsed Forces file JSON:', forcesData);
 
     } catch (error) {
@@ -1115,14 +1267,44 @@ function PostProcessing() {
     }
   };
 
+  // Render file explorer
   const renderFileExplorer = () => {
+    console.log('Rendering file explorer with simulationData:', simulationData);
+
     if (!simulationData) {
+      console.log('No simulation data available');
       return (
         <div className="empty-explorer">
           <p>No simulation data loaded</p>
           <button onClick={handleImportFolder} className="import-folder-btn">
             Import Folder
           </button>
+        </div>
+      );
+    }
+
+    const files = simulationData.files || {};
+    console.log('Files object:', files);
+    console.log('Files object keys:', Object.keys(files));
+    console.log('Files object type:', typeof files);
+
+    const hasFiles = Object.keys(files).some(fileType =>
+      Array.isArray(files[fileType]) && files[fileType].length > 0
+    );
+
+    console.log('Has files:', hasFiles);
+
+    if (!hasFiles) {
+      return (
+        <div className="empty-explorer">
+          <h3>{simulationData.simName}</h3>
+          <p>No files found in the simulation folder</p>
+          <button onClick={handleImportFolder} className="import-folder-btn">
+            Import Different Folder
+          </button>
+          <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+            Debug: {JSON.stringify(simulationData, null, 2)}
+          </div>
         </div>
       );
     }
@@ -1145,30 +1327,37 @@ function PostProcessing() {
         </div>
 
         <div className="file-tree">
-          {Object.entries(simulationData.files).map(([fileType, files]) => {
-            if (files.length === 0) return null;
+          {Object.entries(files).map(([fileType, fileList]) => {
+            console.log(`Rendering file type: ${fileType}, files:`, fileList);
+
+            if (!Array.isArray(fileList) || fileList.length === 0) {
+              console.log(`Skipping ${fileType} - no files or not array`);
+              return null;
+            }
 
             return (
               <div key={fileType} className="file-type-section">
                 <div className="file-type-header">
                   <span className="file-type-icon">{getFileTypeIcon(fileType)}</span>
-                  <span className="file-type-name">{fileType.toUpperCase()} Files ({files.length})</span>
+                  <span className="file-type-name">{fileType.toUpperCase()} Files ({fileList.length})</span>
                 </div>
-                {files.map((file, index) => (
-                  <div
-                    key={index}
-                    className={`file-item ${isFileSelected(file) ? 'selected' : ''} ${['dat', 'cp', 'forces'].includes(fileType) ? 'selectable' : 'non-selectable'
-                      }`}
-                    onClick={() => handleFileSelect(file)}
-                    title={file.name} // Tooltip for full filename
-                  >
-                    <span className="file-icon">
-                      {getFileIcon(file.name)}
-                    </span>
-                    <span className="file-name">{file.name}</span>
-                    {isFileSelected(file) && <span className="selected-indicator">✓</span>}
-                  </div>
-                ))}
+                {fileList.map((file, index) => {
+                  console.log(`Rendering file ${index}:`, file);
+                  return (
+                    <div
+                      key={index}
+                      className={`file-item ${isFileSelected(file) ? 'selected' : ''} ${['dat', 'cp', 'forces'].includes(fileType) ? 'selectable' : 'non-selectable'}`}
+                      onClick={() => handleFileSelect(file)}
+                      title={file.name}
+                    >
+                      <span className="file-icon">
+                        {getFileIcon(file.name)}
+                      </span>
+                      <span className="file-name">{file.name}</span>
+                      {isFileSelected(file) && <span className="selected-indicator">✓</span>}
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -1226,6 +1415,9 @@ function PostProcessing() {
           <button onClick={handleImportFolder} className="header-btn import-btn">
             Import Folder
           </button>
+          <button onClick={handleNavigateToProWim} className="header-btn prowim-btn">
+            ProWiM
+          </button>
           <button onClick={() => navigate('/')} className="header-btn back-btn">
             Back to Main Module
           </button>
@@ -1233,7 +1425,6 @@ function PostProcessing() {
       </div>
 
       <div className="postprocessing-content">
-
         {/* File Explorer Sidebar */}
         <div
           className={`file-explorer ${isExplorerOpen ? 'open' : 'closed'}`}
