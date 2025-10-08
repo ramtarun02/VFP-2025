@@ -17,6 +17,7 @@ import { useContext } from "react";
 import FormDataContext from "./FormDataContext";
 import "./SimulationRun.css";
 
+
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -226,10 +227,10 @@ const SimulationRun = () => {
         title: {
           display: true,
           text: "Iterations",
-          color: "#1565c0", // Blue theme
+          color: "#000000ff", // Blue theme
         },
         ticks: {
-          color: "#1976d2", // Blue theme
+          color: "#000000ff", // Blue theme
         },
         grid: {
           color: "rgba(33, 150, 243, 0.1)", // Blue theme
@@ -240,27 +241,12 @@ const SimulationRun = () => {
         title: {
           display: true,
           text: "Residuals",
-          color: "#1565c0", // Blue theme
+          color: "#000000ff", // Blue theme
         },
         type: "linear",
-        min: 1e-15, // Set minimum value for log scale
+        min: -0.005,
         ticks: {
-          color: "#1976d2", // Blue theme
-          callback: function (value, index, ticks) {
-            // Format numbers in scientific notation with 4 decimal places
-            if (value === 0) return '0.0000E+0';
-
-            const exponent = Math.floor(Math.log10(Math.abs(value)));
-            const mantissa = value / Math.pow(10, exponent);
-
-            // Format mantissa to 4 decimal places
-            const formattedMantissa = mantissa.toFixed(4);
-
-            // Format exponent with proper sign
-            const formattedExponent = exponent >= 0 ? `+${exponent}` : `${exponent}`;
-
-            return `${formattedMantissa}E${formattedExponent}`;
-          }
+          color: "#000000ff" // Black
         },
         grid: {
           color: "rgba(33, 150, 243, 0.1)", // Blue theme

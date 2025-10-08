@@ -55,5 +55,5 @@ for flow_file in ordered_flows[1:]:
     quoted_flow = '"' + current_flow + '"' 
     dump_file =  geo_name + previous_flow
     print(f"Running continuation for: {quoted_flow} (dump from {previous_flow}, dumb file: {dump_file})")
-    subprocess.run(['runvfphe_v4.bat', map_name, geo_name, current_flow, 'n', 'y', dump_file], shell=True, timeout=120)
+    subprocess.run(['runvfphe_v4.bat', map_name, geo_name, current_flow, 'n', 'y', dump_file], shell=True)
     previous_flow = current_flow

@@ -14,7 +14,8 @@ import io
 import math 
 import numpy as np
 import matplotlib.pyplot as plt
-
+import threading
+import time
 
 current_process = None
 app = Flask(__name__)
@@ -26,22 +27,21 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Ensure the upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
-
 def allowed_file(filename):
     """Check if the file has an allowed extension."""
     ALLOWED_EXTENSIONS = {'GEO'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-# # Secret key for signing session cookies (required for Flask sessions)
-# app.config['SECRET_KEY'] = 'mysecret'
-# app.config['SESSION_TYPE'] = 'filesystem'
 
-
-# # Initialize the session
-# Session(app)
-# Change to manage_session=False to manually handle sessions
-socketio = SocketIO(app, manage_session=True, cors_allowed_origins = '*')
-
+# Configure SocketIO with longer timeout settings
+socketio = SocketIO(
+    app, 
+    manage_session=True, 
+    cors_allowed_origins='*',
+    ping_timeout=300,  # 5 minutes
+    ping_interval=25,  # 25 seconds
+    logger=True,
+    engineio_logger=True
+)
 
 @app.route('/start-vfp', methods=['POST'])
 def run_vfp():
@@ -73,7 +73,7 @@ def run_vfp():
             files_received[file_key] = file.filename  # Store file names
     # Construct a response
     response = {
-        "message": "VFP Run Successful! Here are your inputs:",
+        "message": "VFP Run Starting! Here are your inputs:",
         "user_inputs": {
             "mach": mach,
             "aoa": aoa,
@@ -90,165 +90,165 @@ def run_vfp():
     }
     return jsonify(response)
 
-# @app.route("/download-zip", methods=['POST'])
-# def download_zip():
-#     try:
-#         # Ensure form data is present
-#         if 'simName' not in request.form:
-#             return jsonify({"error": "Missing simName in request."}), 400
-#         sim_name = request.form['simName']
-#         TEMP_ZIP_DIR = "./Simulations"
-#         sim_folder_path = os.path.join("./Simulations", sim_name)
-#         zip_file_path = os.path.join("./Simulations", f"{sim_name}.zip")
-#         # Check if simulation folder exists
-#         if not os.path.exists(sim_folder_path):
-#             return jsonify({"error": "Simulation folder not found."}), 404
-#         # Ensure temp directory exists
-#         os.makedirs(TEMP_ZIP_DIR, exist_ok=True)
-#         # Create a zip file using zipfile module
-#         with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-#             for root, _, files in os.walk(sim_folder_path):
-#                 for file in files:
-#                     file_path = os.path.join(root, file)
-#                     arcname = os.path.relpath(file_path, sim_folder_path)
-#                     zipf.write(file_path, arcname)
-#         # Send the file to the client
-#         return send_file(zip_file_path, as_attachment=True)
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
-#     finally:
-#         # Cleanup temporary zip file after request completes
-#         if os.path.exists(zip_file_path):
-#             os.remove(zip_file_path)
+def stream_process_threaded(command, cwd):
+    """Run process in a separate thread to avoid blocking WebSocket"""
+    global current_process
+    
+    def run_process():
+        global current_process
+        try:
+            # Use app context for socketio.emit
+            with app.app_context():
+                socketio.emit('message', f"Starting process: {' '.join(command)}")
+                current_process = subprocess.Popen(
+                    command, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.STDOUT, 
+                    text=True, 
+                    cwd=cwd,
+                    bufsize=1,  # Line buffered
+                    universal_newlines=True
+                )
 
+                # Stream output line-by-line with periodic heartbeats
+                last_output_time = time.time()
+                while True:
+                    output = current_process.stdout.readline()
+                    if output == '' and current_process.poll() is not None:
+                        break
+                    if output:
+                        clean_line = output.strip()
+                        print(clean_line)
+                        socketio.emit('message', clean_line)
+                        last_output_time = time.time()
+                    else:
+                        # Send heartbeat every 5 seconds if no output
+                        current_time = time.time()
+                        if current_time - last_output_time > 5:
+                            socketio.emit('heartbeat', {'status': 'running', 'timestamp': current_time})
+                            last_output_time = current_time
+                        time.sleep(1)
+
+                current_process.stdout.close()
+                return_code = current_process.wait()
+                
+                if return_code == 0:
+                    socketio.emit('message', '[DONE] Process completed successfully')
+                else:
+                    socketio.emit('message', f'Process completed with return code: {return_code}')
+
+        except Exception as e:
+            with app.app_context():
+                socketio.emit('message', f"Error during process execution: {str(e)}")
+            print(f"Process error: {e}")
+        finally:
+            current_process = None
+
+    # Start the process in a separate thread
+    thread = threading.Thread(target=run_process)
+    thread.daemon = True
+    thread.start()
+
+def stream_bat_process_threaded(bat_file_path, cwd, args=None):
+    """Stream output from a .bat file execution with arguments in a separate thread"""
+    global current_process
+    
+    def run_bat_process():
+        global current_process
+        try:
+            # Use app context for socketio.emit
+            with app.app_context():
+                # Ensure we're using the full path and proper command format
+                if not os.path.isabs(bat_file_path):
+                    bat_file_path_abs = os.path.abspath(bat_file_path)
+                else:
+                    bat_file_path_abs = bat_file_path
+                
+                socketio.emit('message', f"Executing batch file: {bat_file_path_abs}")
+                socketio.emit('message', f"Working directory: {cwd}")
+                
+                # Build command with arguments
+                if args:
+                    command = ['cmd', '/c', os.path.basename(bat_file_path_abs)] + args
+                    socketio.emit('message', f"Arguments: {' '.join(args)}")
+                else:
+                    command = ['cmd', '/c', os.path.basename(bat_file_path_abs)]
+                
+                socketio.emit('message', f"Full command: {' '.join(command)}")
+                
+                current_process = subprocess.Popen(
+                    command, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.STDOUT, 
+                    text=True, 
+                    cwd=cwd,
+                    shell=False,
+                    bufsize=1,  # Line buffered
+                    universal_newlines=True
+                )
+
+                # Stream output line-by-line with periodic heartbeats
+                last_output_time = time.time()
+                while True:
+                    output = current_process.stdout.readline()
+                    if output == '' and current_process.poll() is not None:
+                        break
+                    if output:
+                        clean_line = output.strip()
+                        print(clean_line)
+                        socketio.emit('message', clean_line)
+                        last_output_time = time.time()
+                    else:
+                        # Send heartbeat every 10 seconds if no output
+                        current_time = time.time()
+                        if current_time - last_output_time > 10:
+                            socketio.emit('heartbeat', {'status': 'running', 'timestamp': current_time})
+                            last_output_time = current_time
+                        time.sleep(1)
+
+                current_process.stdout.close()
+                return_code = current_process.wait()
+                
+                if return_code == 0:
+                    socketio.emit('message', '[DONE] Solver Run Complete')
+                else:
+                    socketio.emit('message', f'Solver completed with return code: {return_code}')
+                    socketio.emit('message', 'Check the batch file for syntax errors or missing dependencies')
+
+        except Exception as e:
+            with app.app_context():
+                socketio.emit('message', f"Error during BAT execution: {str(e)}")
+            print(f"Full error details: {e}")
+        finally:
+            current_process = None
+
+    # Start the batch process in a separate thread
+    thread = threading.Thread(target=run_bat_process)
+    thread.daemon = True
+    thread.start()
 
 @socketio.on('connect')
 def handle_connect():
     print("Client connected")
     emit('message', "WebSocket connection established")
 
-
-
-current_process = None  # Global reference
-
-def stream_process(command, cwd):
+@socketio.on('disconnect')
+def handle_disconnect():
+    print("Client disconnected")
+    # Kill any running process if client disconnects
     global current_process
-    try:
-        current_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=cwd)
+    if current_process:
+        try:
+            current_process.terminate()
+            current_process = None
+            print("Terminated running process due to client disconnect")
+        except Exception as e:
+            print(f"Error terminating process: {e}")
 
-        # Stream output line-by-line
-        for line in iter(current_process.stdout.readline, ''):
-            if line:
-                clean_line = line.strip()
-                print(clean_line)
-                emit('message', clean_line)
-
-        current_process.stdout.close()
-        current_process.wait()
-        emit('message', 'Simulation completed successfully!')
-
-    except Exception as e:
-        emit('message', f"Error during execution: {str(e)}")
-
-
-current_process = None  # Global reference
-
-def stream_bat_process(bat_file_path, cwd, args=None):
-    """Stream output from a .bat file execution with arguments"""
-    global current_process
-    try:
-        # Ensure we're using the full path and proper command format
-        if not os.path.isabs(bat_file_path):
-            bat_file_path = os.path.abspath(bat_file_path)
-        
-        emit('message', f"Executing batch file: {bat_file_path}")
-        emit('message', f"Working directory: {cwd}")
-        
-        # Build command with arguments
-        if args:
-            command = ['cmd', '/c', os.path.basename(bat_file_path)] + args
-            emit('message', f"Arguments: {' '.join(args)}")
-        else:
-            command = ['cmd', '/c', os.path.basename(bat_file_path)]
-        
-        emit('message', f"Full command: {' '.join(command)}")
-        
-        current_process = subprocess.Popen(
-            command, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT, 
-            text=True, 
-            cwd=cwd,
-            shell=False
-        )
-
-        # Stream output line-by-line
-        for line in iter(current_process.stdout.readline, ''):
-            if line:
-                clean_line = line.strip()
-                print(clean_line)
-                emit('message', clean_line)
-
-        current_process.stdout.close()
-        return_code = current_process.wait()
-        
-        if return_code == 0:
-            emit('message', '[DONE] Solver Run Complete')
-        else:
-            emit('message', f'Solver completed with return code: {return_code}')
-            emit('message', 'Check the batch file for syntax errors or missing dependencies')
-
-    except Exception as e:
-        emit('message', f"Error during BAT execution: {str(e)}")
-        print(f"Full error details: {e}")
-
-def stream_bat_process_alternative(bat_file_path, cwd, args=None):
-    """Alternative method to stream batch file output with arguments"""
-    global current_process
-    try:
-        # Change to the working directory first
-        original_cwd = os.getcwd()
-        os.chdir(cwd)
-        
-        emit('message', f"Changed to directory: {cwd}")
-        emit('message', f"Executing: {os.path.basename(bat_file_path)}")
-        
-        # Build command with arguments
-        if args:
-            command = f"{os.path.basename(bat_file_path)} {' '.join(args)}"
-            emit('message', f"Command with args: {command}")
-        else:
-            command = os.path.basename(bat_file_path)
-        
-        # Execute the batch file with arguments
-        current_process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT, 
-            text=True,
-            shell=True
-        )
-
-        # Stream output line-by-line
-        for line in iter(current_process.stdout.readline, ''):
-            if line:
-                clean_line = line.strip()
-                print(clean_line)
-                emit('message', clean_line)
-
-        current_process.stdout.close()
-        return_code = current_process.wait()
-        
-        if return_code == 0:
-            emit('message', '[DONE] Solver Run Complete')
-        else:
-            emit('message', f'Solver completed with return code: {return_code}')
-
-    except Exception as e:
-        emit('message', f"Error during BAT execution: {str(e)}")
-    finally:
-        # Always change back to original directory
-        os.chdir(original_cwd)
+@socketio.on('ping')
+def handle_ping():
+    """Handle client ping to keep connection alive"""
+    emit('pong', {'timestamp': time.time()})
 
 @socketio.on('start_simulation')
 def start_simulation(data=None):
@@ -267,7 +267,7 @@ def start_simulation(data=None):
                 emit('error', f"Simulation folder '{sim_folder}' not found")
                 return
 
-            # Get specific file names from client data - use the correct keys
+            # Get specific file names from client data
             map_filename = data.get('mapFile', '')
             geo_filename = data.get('geoFile', '')
             dat_filename = data.get('datFile', '')
@@ -299,18 +299,17 @@ def start_simulation(data=None):
             emit('message', f"Found all required files: {map_filename}, {geo_filename}, {dat_filename}")
 
             # Remove file extensions for batch file arguments
-            map_file = os.path.splitext(map_filename)[0]  # Remove extension
-            geo_file = os.path.splitext(geo_filename)[0]  # Remove extension
-            dat_file = os.path.splitext(dat_filename)[0]  # Remove extension
+            map_file = os.path.splitext(map_filename)[0]
+            geo_file = os.path.splitext(geo_filename)[0]
+            dat_file = os.path.splitext(dat_filename)[0]
 
-            # Extract boolean values and store as 'y' (true) or 'n' (false)
+            # Extract boolean values
             con = data.get("continuation", "false").lower() == "true"
             auto = data.get("autoRunner", "false").lower() == "true"
             exc = data.get("excrescence", "false").lower() == "true"
             dump = data.get("dump", "false").lower() == "true"
             
             dump_file = data.get('dumpName', '')
-            # Remove extension from dump file name if present
             if dump_file and '.' in dump_file:
                 dump_file = os.path.splitext(dump_file)[0]
 
@@ -331,7 +330,6 @@ def start_simulation(data=None):
                 emit('error', f"Batch file 'runvfphe_v4.bat' not found in {sim_folder}")
                 return
 
-            # Rest of the function remains the same...
             # Decision logic based on configuration
             if auto and not con and not exc:
                 # Case 3: Auto runner mode
@@ -340,9 +338,8 @@ def start_simulation(data=None):
                 dalpha = data.get("dalpha", "1")
                 alphaN = data.get("alphaN", "1")
                 
-                # Use stream_process to run VFP_Full_Process.py
-                # Use full filename with extension for Python script
-                stream_process([
+                # Use threaded process to run VFP_Full_Process.py
+                stream_process_threaded([
                     "python", "VFP_Full_Process.py", 
                     dat_filename, dalpha, alphaN, map_file, geo_file
                 ], sim_folder)
@@ -351,9 +348,7 @@ def start_simulation(data=None):
                 # Case 2: Continuation mode
                 emit('message', "Running in Continuation mode...")
                 
-                # Check if dump file exists when continuation is true
                 if dump_file:
-                    # Check for .fort52 file specifically (as per bat file)
                     dump_file_path = os.path.join(sim_folder, dump_file + ".fort52")
                     if not os.path.exists(dump_file_path):
                         emit('error', f"Dump file '{dump_file}.fort52' not found in simulation folder")
@@ -363,73 +358,31 @@ def start_simulation(data=None):
                     emit('error', "Dump file name is required for continuation run")
                     return
 
-                # Prepare arguments for continuation mode
                 bat_args = [
-                    map_file,           # map_base (without extension)
-                    geo_file,           # geo_base (without extension)  
-                    dat_file,           # flow_base (without extension)
-                    "n",                # excres = no
-                    "y",                # cont = yes
-                    dump_file           # dump_base (without extension)
+                    map_file, geo_file, dat_file, "n", "y", dump_file
                 ]
-
                 emit('message', f"Batch arguments: {' '.join(bat_args)}")
-
-                # Try the main method first, then fallback to alternative
-                try:
-                    stream_bat_process(bat_file_path, sim_folder, bat_args)
-                except Exception as e:
-                    emit('message', f"Primary method failed: {str(e)}")
-                    emit('message', "Trying alternative execution method...")
-                    stream_bat_process_alternative(bat_file_path, sim_folder, bat_args)
+                stream_bat_process_threaded(bat_file_path, sim_folder, bat_args)
 
             elif not con and not auto and not exc:
-                # Case 1: Standard mode (all false)
+                # Case 1: Standard mode
                 emit('message', "Running in Standard mode...")
                 
-                # Prepare arguments for standard mode
                 bat_args = [
-                    map_file,           # map_base (without extension)
-                    geo_file,           # geo_base (without extension)
-                    dat_file,           # flow_base (without extension)
-                    "n",                # excres = no
-                    "n",                # cont = no
-                    ""                  # dump_base = empty for standard mode
+                    map_file, geo_file, dat_file, "n", "n", ""
                 ]
-
                 emit('message', f"Batch arguments: {' '.join(bat_args)}")
-
-                # Try the main method first, then fallback to alternative
-                try:
-                    stream_bat_process(bat_file_path, sim_folder, bat_args)
-                except Exception as e:
-                    emit('message', f"Primary method failed: {str(e)}")
-                    emit('message', "Trying alternative execution method...")
-                    stream_bat_process_alternative(bat_file_path, sim_folder, bat_args)
+                stream_bat_process_threaded(bat_file_path, sim_folder, bat_args)
 
             elif exc and not con and not auto:
                 # Case 4: Excrescence mode
                 emit('message', "Running in Excrescence mode...")
                 
-                # Prepare arguments for excrescence mode
                 bat_args = [
-                    map_file,           # map_base (without extension)
-                    geo_file,           # geo_base (without extension)
-                    dat_file,           # flow_base (without extension)
-                    "y",                # excres = yes
-                    "n",                # cont = no
-                    ""                  # dump_base = empty for excrescence mode
+                    map_file, geo_file, dat_file, "y", "n", ""
                 ]
-
                 emit('message', f"Batch arguments: {' '.join(bat_args)}")
-
-                # Try the main method first, then fallback to alternative
-                try:
-                    stream_bat_process(bat_file_path, sim_folder, bat_args)
-                except Exception as e:
-                    emit('message', f"Primary method failed: {str(e)}")
-                    emit('message', "Trying alternative execution method...")
-                    stream_bat_process_alternative(bat_file_path, sim_folder, bat_args)
+                stream_bat_process_threaded(bat_file_path, sim_folder, bat_args)
 
             else:
                 # Handle invalid combinations
@@ -449,8 +402,19 @@ def start_simulation(data=None):
         print("No simulation data provided or 'simName' missing")
         emit('error', "Simulation data missing required fields")
 
-
-
+@socketio.on('stop_simulation')
+def stop_simulation():
+    """Allow client to stop running simulation"""
+    global current_process
+    if current_process:
+        try:
+            current_process.terminate()
+            current_process = None
+            emit('message', "Simulation stopped by user")
+        except Exception as e:
+            emit('error', f"Error stopping simulation: {str(e)}")
+    else:
+        emit('message', "No simulation currently running")
 
 @socketio.on('download')
 def handle_download(data):
@@ -482,13 +446,6 @@ def handle_download(data):
 
     except Exception as e:
         emit('message', f"Error during download: {str(e)}")
-
-
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    print("Client disconnected")
-
 
 @socketio.on('get_simulation_folder')
 def handle_get_simulation_folder(data):
@@ -552,11 +509,6 @@ def handle_get_simulation_folder(data):
             'message': str(e)
         })
 
-
-
-# Add this route to your Flask app
-
-@app.route('/get_file_content', methods=['POST'])
 def get_file_content():
     try:
         data = request.get_json()
@@ -588,7 +540,6 @@ def get_file_content():
     except Exception as e:
         print(f"Error reading file: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/import-geo', methods=['POST'])
 def import_geo():
@@ -641,8 +592,6 @@ def import_geo():
     # Return the JSON response with all results
     return jsonify({'results': results}), 200
 
-
-
 def compute_KS0D(CL0, CD0, A):
     CL0 = np.array(CL0, dtype=float)
     CD0 = np.array(CD0, dtype=float)
@@ -654,7 +603,6 @@ def compute_TS0D(CL0, CD0, A):
     CD0 = np.array(CD0, dtype=float)    
     val = np.degrees(np.arctan((2 * CL0 / (math.pi * A)) / (1 - (2 * CD0 / (math.pi * A)))))
     return np.round(val, 3)
-
 
 @app.route("/prowim-compute", methods=["POST"])
 def compute():
@@ -750,7 +698,6 @@ def compute():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/compute_desired', methods=['POST'])
 def compute_desired():
@@ -936,7 +883,5 @@ def export_geo():
         print(f"Error in export_geo endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
-

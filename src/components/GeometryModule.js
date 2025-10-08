@@ -14,6 +14,36 @@ function GeometryModule() {
   const [modifiedParameters, setModifiedParameters] = useState({});
   const [selected2DPlot, setSelected2DPlot] = useState("");
   const navigate = useNavigate();
+  const [wingSpecs, setWingSpecs] = useState({
+    aspectRatio: 0,
+    wingSpan: 0,
+    numSections: 0,
+    taperRatio: 0
+  });
+
+  const calculateWingSpecs = (geoData) => {
+    if (!geoData || geoData.length === 0) {
+      return {
+        aspectRatio: 0,
+        wingSpan: 0,
+        numSections: 0,
+        taperRatio: 0
+      };
+    }
+    const numSections = geoData.length;
+    const lastSection = geoData[geoData.length - 1];
+    const wingSpan = 2 * lastSection.YSECT; // Assuming symmetry
+    const tipChord = lastSection.G2SECT - lastSection.G1SECT;
+    const taperRatio = tipChord;
+    const aspectRatio = (2 * wingSpan) / (1 + taperRatio);
+    return {
+      aspectRatio: aspectRatio.toFixed(2),
+      wingSpan: wingSpan.toFixed(3),
+      numSections: numSections,
+      taperRatio: taperRatio.toFixed(2)
+    }
+
+  };
 
   // Color palette for different GEO files
   const colorPalette = [
@@ -165,6 +195,15 @@ function GeometryModule() {
       setSelectedSection(selectedFile.selectedSection);
       updateParameters(selectedFile.selectedSection);
       setModifiedParameters({}); // Clear modified parameters when switching files
+      const specs = calculateWingSpecs(geoData);
+      setWingSpecs(specs);
+    } else {
+      setWingSpecs({
+        aspectRatio: 0,
+        wingSpan: 0,
+        numSections: 0,
+        taperRatio: 0
+      });
     }
   };
 
@@ -592,23 +631,19 @@ function GeometryModule() {
                   <tbody>
                     <tr>
                       <td>Aspect Ratio</td>
-                      <td><input type="text" className="input-field" value="0" readOnly /></td>
+                      <td><input type="text" className="input-field" value={wingSpecs.aspectRatio} readOnly /></td>
                     </tr>
                     <tr>
                       <td>Wing Span</td>
-                      <td><input type="text" className="input-field" value="0" readOnly /></td>
-                    </tr>
-                    <tr>
-                      <td>Washout</td>
-                      <td><input type="text" className="input-field" value="0" readOnly /></td>
+                      <td><input type="text" className="input-field" value={wingSpecs.wingSpan} readOnly /></td>
                     </tr>
                     <tr>
                       <td>Number of Sections</td>
-                      <td><input type="text" className="input-field" value="0" readOnly /></td>
+                      <td><input type="text" className="input-field" value={wingSpecs.numSections} readOnly /></td>
                     </tr>
                     <tr>
                       <td>Taper Ratio</td>
-                      <td><input type="text" className="input-field" value="0" readOnly /></td>
+                      <td><input type="text" className="input-field" value={wingSpecs.taperRatio} readOnly /></td>
                     </tr>
                   </tbody>
                 </table>
