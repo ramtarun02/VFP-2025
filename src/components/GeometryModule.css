@@ -364,6 +364,573 @@
   }
 }
 
+/* ...existing code... */
+
+/* Improve Panel Styling */
+.improve-panel {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.improve-container {
+  padding: 20px;
+}
+
+.improve-title {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  text-align: center;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 10px;
+}
+
+.improve-radio-group {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.improve-radio-group label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 500;
+  color: #555;
+  transition: color 0.2s ease;
+}
+
+.improve-radio-group label:hover {
+  color: #007bff;
+}
+
+.improve-radio-group input[type="radio"] {
+  margin-right: 8px;
+  transform: scale(1.1);
+  accent-color: #007bff;
+}
+
+.improve-sections {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.section-range {
+  margin-bottom: 15px;
+}
+
+.section-range label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #555;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range-inputs select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.range-inputs select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.range-inputs select:disabled {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.range-inputs span {
+  font-weight: 500;
+  color: #666;
+  white-space: nowrap;
+}
+
+.formula-display {
+  text-align: center;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+}
+
+.formula-display span {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.a-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.a-value label {
+  font-weight: 500;
+  color: #555;
+  white-space: nowrap;
+}
+
+.a-value input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.a-value input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.improve-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.improve-controls button {
+  padding: 10px 30px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.improve-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.improve-controls .btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.improve-controls .btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.improve-controls .btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 123, 255, 0.3);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  .improve-radio-group {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .range-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .range-inputs span {
+    text-align: center;
+    margin: 5px 0;
+  }
+}
+
+/* ...existing code... */
+
+/* Planform View Toggle Styling */
+.planform-toggle {
+  margin-left: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  color: #555;
+}
+
+.toggle-checkbox {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+  background-color: #ccc;
+  border-radius: 12px;
+  transition: background-color 0.3s ease;
+  margin-right: 8px;
+}
+
+.toggle-slider:before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: white;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-checkbox:checked+.toggle-slider {
+  background-color: #007bff;
+}
+
+.toggle-checkbox:checked+.toggle-slider:before {
+  transform: translateX(26px);
+}
+
+.toggle-checkbox:disabled+.toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-checkbox:disabled+.toggle-slider+.toggle-text {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-label:hover .toggle-slider:not(.toggle-checkbox:disabled + .toggle-slider) {
+  background-color: #999;
+}
+
+.toggle-label:hover .toggle-checkbox:checked+.toggle-slider {
+  background-color: #0056b3;
+}
+
+.toggle-text {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Update dropdown container to handle the toggle */
+.dropdown-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+
+/* Improve Panel Styling */
+.improve-panel {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.improve-container {
+  padding: 20px;
+}
+
+.improve-title {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  text-align: center;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 10px;
+}
+
+.improve-radio-group {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.improve-radio-group label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 500;
+  color: #555;
+  transition: color 0.2s ease;
+}
+
+.improve-radio-group label:hover {
+  color: #007bff;
+}
+
+.improve-radio-group input[type="radio"] {
+  margin-right: 8px;
+  transform: scale(1.1);
+  accent-color: #007bff;
+}
+
+.improve-sections {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.section-range {
+  margin-bottom: 15px;
+}
+
+.section-range label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #555;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range-inputs select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.range-inputs select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.range-inputs select:disabled {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.range-inputs span {
+  font-weight: 500;
+  color: #666;
+  white-space: nowrap;
+}
+
+.formula-display {
+  text-align: center;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+}
+
+.formula-display span {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.a-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.a-value label {
+  font-weight: 500;
+  color: #555;
+  white-space: nowrap;
+}
+
+.a-value input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.a-value input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.improve-controls {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.improve-controls button {
+  padding: 10px 25px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.improve-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.improve-controls .btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.improve-controls .btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.improve-controls .btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.improve-controls .btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.improve-controls button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Update computation controls to match improve controls styling */
+.computation-controls {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.computation-controls button {
+  padding: 10px 25px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.computation-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.computation-controls .btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.computation-controls .btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+.computation-controls .btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.computation-controls .btn-danger:hover:not(:disabled) {
+  background-color: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.computation-controls button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Responsive adjustments for button groups */
+@media (max-width: 768px) {
+
+  .improve-controls,
+  .computation-controls {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .improve-controls button,
+  .computation-controls button {
+    width: 100%;
+    max-width: 200px;
+  }
+
+  .dropdown-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .planform-toggle {
+    margin-left: 0;
+    margin-top: 10px;
+  }
+}
+
+
 @media (max-width: 900px) {
   .header {
     flex-direction: column;

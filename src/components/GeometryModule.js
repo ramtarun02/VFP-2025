@@ -3,6 +3,7 @@ import Plot3D from './Plot3D';
 import Plot2D from './Plot2D';
 import "./GeometryModule.css";
 import { useNavigate } from "react-router-dom";
+import { reverse } from 'd3';
 
 function GeometryModule() {
   const [geoFiles, setGeoFiles] = useState([]); // Array to store multiple GEO files
@@ -13,12 +14,21 @@ function GeometryModule() {
   const [parameters, setParameters] = useState({});
   const [modifiedParameters, setModifiedParameters] = useState({});
   const [selected2DPlot, setSelected2DPlot] = useState("");
+  const [planformView, setPlanformView] = useState(false); // New state for planform view toggle
   const navigate = useNavigate();
   const [wingSpecs, setWingSpecs] = useState({
     aspectRatio: 0,
     wingSpan: 0,
     numSections: 0,
     taperRatio: 0
+  });
+
+  // New state for Improve Panel
+  const [improveSettings, setImproveSettings] = useState({
+    selectedParameter: 'Twist',
+    startSection: 1,
+    endSection: 1,
+    aValue: 0
   });
 
   const calculateWingSpecs = (geoData) => {
@@ -42,7 +52,6 @@ function GeometryModule() {
       numSections: numSections,
       taperRatio: taperRatio.toFixed(2)
     }
-
   };
 
   // Color palette for different GEO files
@@ -60,7 +69,6 @@ function GeometryModule() {
     return filename.replace(/\.[^/.]+$/, "");
   };
 
-  // File upload handler - supports multiple files
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (!files.length) return;
@@ -108,6 +116,12 @@ function GeometryModule() {
           setSelectedGeoFile(firstFile);
           setSections(["3D Wing", ...firstFile.originalGeoData.map((_, i) => `Section ${i + 1}`)]);
           setSelectedSection(-1);
+
+          // Update improve settings with available sections
+          setImproveSettings(prev => ({
+            ...prev,
+            endSection: firstFile.originalGeoData.length
+          }));
         }
 
         // Add all new files to visible 2D files by default
@@ -182,8 +196,6 @@ function GeometryModule() {
     }
   };
 
-
-
   const handleGeoFileSelection = (event) => {
     const fileId = parseInt(event.target.value);
     const selectedFile = geoFiles.find(file => file.id === fileId);
@@ -197,6 +209,15 @@ function GeometryModule() {
       setModifiedParameters({}); // Clear modified parameters when switching files
       const specs = calculateWingSpecs(geoData);
       setWingSpecs(specs);
+
+      // Update improve settings with available sections
+      setImproveSettings(prev => ({
+        ...prev,
+        endSection: geoData.length
+      }));
+
+      // Reset planform view when switching files
+      setPlanformView(false);
     } else {
       setWingSpecs({
         aspectRatio: 0,
@@ -222,6 +243,11 @@ function GeometryModule() {
     setSelected2DPlot("");
     setModifiedParameters({}); // Clear modified parameters when switching sections
 
+    // Reset planform view when not in 3D Wing mode
+    if (sectionIndex !== -1) {
+      setPlanformView(false);
+    }
+
     // Update the selected section for the current file
     if (selectedGeoFile) {
       setGeoFiles(prev => prev.map(file =>
@@ -230,6 +256,12 @@ function GeometryModule() {
           : file
       ));
       setSelectedGeoFile(prev => ({ ...prev, selectedSection: sectionIndex }));
+    }
+  };
+
+  const handlePlanformToggle = () => {
+    if (selectedSection === -1) { // Only allow when 3D Wing is selected
+      setPlanformView(!planformView);
     }
   };
 
@@ -265,6 +297,144 @@ function GeometryModule() {
       ...prev,
       [param]: value
     }));
+  };
+
+  // New function to handle improve settings change
+  const handleImproveSettingsChange = (field, value) => {
+    setImproveSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // New function to perform interpolation
+  const performInterpolation = async () => {
+    if (!selectedGeoFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    const { selectedParameter, startSection, endSection, aValue } = improveSettings;
+
+    if (startSection < 1 || endSection < 1 || startSection > endSection) {
+      alert('Please enter valid start and end sections');
+      return;
+    }
+
+    const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
+    const numSections = geoData.length;
+
+    if (startSection > numSections || endSection > numSections) {
+      alert(`Section numbers must be between 1 and ${numSections}`);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/interpolate_parameter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          geoData: geoData,
+          plotData: selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData,
+          parameter: selectedParameter,
+          startSection: startSection - 1, // Convert to 0-based index
+          endSection: endSection - 1, // Convert to 0-based index
+          aValue: parseFloat(aValue)
+        }),
+      });
+
+      const { updatedGeoData, updatedPlotData } = await response.json();
+
+      if (updatedPlotData) {
+        // Update the selected file with modified data
+        setGeoFiles(prev => prev.map(file =>
+          file.id === selectedGeoFile.id
+            ? { ...file, modifiedGeoData: updatedGeoData, modifiedPlotData: updatedPlotData }
+            : file
+        ));
+
+        // Update selectedGeoFile reference
+        setSelectedGeoFile(prev => ({
+          ...prev,
+          modifiedGeoData: updatedGeoData,
+          modifiedPlotData: updatedPlotData
+        }));
+
+        // Update parameters if a section is selected
+        if (selectedSection >= 0) {
+          updateParameters(selectedSection);
+        }
+
+        console.log('Interpolation completed successfully');
+      }
+    } catch (error) {
+      console.error('Error performing interpolation:', error);
+      alert('Error performing interpolation');
+    }
+  };
+
+  // New function to reset improve changes
+  const resetImproveChanges = () => {
+    if (!selectedGeoFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    // Reset the selected file to original data
+    setGeoFiles(prev => prev.map(file =>
+      file.id === selectedGeoFile.id
+        ? { ...file, modifiedGeoData: null, modifiedPlotData: null }
+        : file
+    ));
+
+    // Update selectedGeoFile reference
+    setSelectedGeoFile(prev => ({
+      ...prev,
+      modifiedGeoData: null,
+      modifiedPlotData: null
+    }));
+
+    // Update parameters if a section is selected
+    if (selectedSection >= 0) {
+      updateParameters(selectedSection);
+    }
+
+    // Clear modified parameters
+    setModifiedParameters({});
+
+    console.log('All changes reset to original data');
+  };
+
+  // Function to reset all changes in Controls panel (renamed from compute Global)
+  const resetAllChanges = () => {
+    if (!selectedGeoFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    // Reset the selected file to original data
+    setGeoFiles(prev => prev.map(file =>
+      file.id === selectedGeoFile.id
+        ? { ...file, modifiedGeoData: null, modifiedPlotData: null }
+        : file
+    ));
+
+    // Update selectedGeoFile reference
+    setSelectedGeoFile(prev => ({
+      ...prev,
+      modifiedGeoData: null,
+      modifiedPlotData: null
+    }));
+
+    // Update parameters if a section is selected
+    if (selectedSection >= 0) {
+      updateParameters(selectedSection);
+    }
+
+    // Clear modified parameters
+    setModifiedParameters({});
+
+    console.log('All changes reset to original data');
   };
 
   const computeDesired = async () => {
@@ -332,25 +502,86 @@ function GeometryModule() {
     const plotData = selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData;
     const color = selectedGeoFile.color;
 
-    return plotData.flatMap((sectionData, index) => [
-      {
-        x: sectionData.xus,
-        y: sectionData.y,
-        z: sectionData.zus,
-        type: 'scatter3d',
+    if (planformView && selectedSection === -1) {
+      // Generate planform view traces (top-down 2D view)
+      const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
+      return geoData.map((section, index) => ({
+        y: [section.G2SECT, section.G1SECT, section.G1SECT, section.G2SECT, section.G2SECT],
+        x: [section.YSECT, section.YSECT, section.YSECT, section.YSECT, section.YSECT],
+        type: 'scatter',
         mode: 'lines',
-        line: { 'color': color.primary, 'width': 6 }
-      },
-      {
-        x: sectionData.xls,
-        y: sectionData.y,
-        z: sectionData.zls,
-        type: 'scatter3d',
-        mode: 'lines',
-        line: { 'color': color.secondary, 'width': 6 }
-      }
-    ]);
+        name: `Section ${index + 1}`,
+        line: {
+          color: index === 0 ? 'red' : 'black', // Highlight root section
+          width: 4
+        }
+      }));
+    } else {
+      // Regular 3D view
+      return plotData.flatMap((sectionData, index) => [
+        {
+          x: sectionData.xus,
+          y: sectionData.y,
+          z: sectionData.zus,
+          type: 'scatter3d',
+          mode: 'lines',
+          line: { 'color': color.primary, 'width': 6 }
+        },
+        {
+          x: sectionData.xls,
+          y: sectionData.y,
+          z: sectionData.zls,
+          type: 'scatter3d',
+          mode: 'lines',
+          line: { 'color': color.secondary, 'width': 6 }
+        }
+      ]);
+    }
   };
+
+  // Get plot layout for 3D view
+  const get3DPlotLayout = () => {
+    if (planformView && selectedSection === -1) {
+      // 2D planform view layout
+      return {
+        xaxis: {
+          title: 'X (Chord Direction)',
+          showgrid: true
+        },
+        yaxis: {
+          title: 'Y (Span Direction)',
+          showgrid: true,
+          autorange: 'reversed' // Reverse y-axis for correct orientation
+        },
+        showlegend: false,
+        title: 'Wing Planform View',
+        autosize: true,
+        margin: { l: 60, r: 20, b: 60, t: 60 },
+        paper_bgcolor: '#f9fafb',
+        plot_bgcolor: '#ffffff',
+        font: { family: 'Times New Roman' }
+      };
+    } else {
+      // Regular 3D layout
+      return {
+        scene: {
+          aspectmode: 'data',
+          xaxis: { title: { text: 'Chordwise (X)', font: { family: 'Times New Roman' } }, showgrid: true },
+          yaxis: { title: { text: 'Spanwise (Y)', font: { family: 'Times New Roman' } }, showgrid: true },
+          zaxis: { title: { text: 'Thickness (Z)', font: { family: 'Times New Roman' } }, showgrid: true },
+          camera: { eye: { x: 1.5, y: 1.5, z: 1.5 } }
+        },
+        title: '3D Wing View',
+        showlegend: false,
+        autosize: true,
+        margin: { l: 25, r: 10, t: 50, b: 25 },
+        font: { family: 'Times New Roman' },
+        paper_bgcolor: '#f9fafb',
+        plot_bgcolor: '#f9fafb'
+      };
+    }
+  };
+
 
   // 2D plot traces (for all visible files)
   const plot2DTrace = () => {
@@ -480,6 +711,13 @@ function GeometryModule() {
     return [];
   };
 
+  // Generate section options for dropdowns
+  const getSectionOptions = () => {
+    if (!selectedGeoFile) return [];
+    const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
+    return geoData.map((_, index) => index + 1);
+  };
+
   return (
     <div className="app">
       <header className="header">
@@ -496,7 +734,7 @@ function GeometryModule() {
               multiple
             />
             <label onClick={() => document.getElementById('fileInput').click()}>
-              Upload GEO Files
+              Import file
             </label>
           </div>
         </div>
@@ -529,7 +767,7 @@ function GeometryModule() {
               </div>
             )}
 
-            {/* Section Selection */}
+            {/* Section Selection with Planform View Toggle */}
             {sections.length > 0 && (
               <div className="dropdown-container">
                 <label htmlFor="section-select">Section: </label>
@@ -541,6 +779,21 @@ function GeometryModule() {
                     </option>
                   ))}
                 </select>
+
+                {/* Planform View Toggle */}
+                <div className="planform-toggle">
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={planformView}
+                      onChange={handlePlanformToggle}
+                      disabled={selectedSection !== -1}
+                      className="toggle-checkbox"
+                    />
+                    <span className="toggle-slider"></span>
+                    <span className="toggle-text">Planform View</span>
+                  </label>
+                </div>
               </div>
             )}
           </div>
@@ -550,6 +803,7 @@ function GeometryModule() {
             <Plot3D
               plotData={plot3DTrace()}
               selectedSection={selectedSection}
+              layout={get3DPlotLayout()}
             />
           )}
 
@@ -649,6 +903,117 @@ function GeometryModule() {
                 </table>
               </div>
             </div>
+
+            {/* Improve Sections Panel */}
+            <div className="improve-panel">
+              <div className="improve-container">
+                <h2 className="improve-title">Improve Sections</h2>
+
+                {/* Parameter Selection */}
+                <div className="improve-radio-group">
+                  <label>
+                    <input
+                      type="radio"
+                      name="improveParameter"
+                      value="Twist"
+                      checked={improveSettings.selectedParameter === 'Twist'}
+                      onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
+                    />
+                    Twist
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="improveParameter"
+                      value="Dihedral"
+                      checked={improveSettings.selectedParameter === 'Dihedral'}
+                      onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
+                    />
+                    Dihedral
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="improveParameter"
+                      value="XLE"
+                      checked={improveSettings.selectedParameter === 'XLE'}
+                      onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
+                    />
+                    XLE
+                  </label>
+                </div>
+
+                {/* Section Range Selection */}
+                <div className="improve-sections">
+                  <div className="section-range">
+                    <label>Sections:</label>
+                    <div className="range-inputs">
+                      <select
+                        value={improveSettings.startSection}
+                        onChange={(e) => handleImproveSettingsChange('startSection', parseInt(e.target.value))}
+                        disabled={!selectedGeoFile}
+                      >
+                        {getSectionOptions().map(sectionNum => (
+                          <option key={sectionNum} value={sectionNum}>
+                            {sectionNum}
+                          </option>
+                        ))}
+                      </select>
+
+                      <span>to</span>
+
+                      <select
+                        value={improveSettings.endSection}
+                        onChange={(e) => handleImproveSettingsChange('endSection', parseInt(e.target.value))}
+                        disabled={!selectedGeoFile}
+                      >
+                        {getSectionOptions().map(sectionNum => (
+                          <option key={sectionNum} value={sectionNum}>
+                            {sectionNum}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Formula Display */}
+                  <div className="formula-display">
+                    <span>(y = ax² + bx + c)</span>
+                  </div>
+
+                  {/* A Value Input */}
+                  <div className="a-value">
+                    <label>a = </label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      value={improveSettings.aValue}
+                      onChange={(e) => handleImproveSettingsChange('aValue', e.target.value)}
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+
+                {/* Improve and Reset Controls */}
+                <div className="improve-controls">
+                  <button
+                    className="btn btn-primary"
+                    onClick={performInterpolation}
+                    disabled={!selectedGeoFile}
+                  >
+                    Improve
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={resetImproveChanges}
+                    disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="controls-panel">
               <div className="controls-container">
                 <h2 className="controls-title">Controls</h2>
@@ -676,7 +1041,13 @@ function GeometryModule() {
                 </table>
                 <div className="computation-controls">
                   <button className="btn btn-primary" onClick={computeDesired}>Compute Desired</button>
-                  <button className="btn btn-primary">Compute Global (b)</button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={resetAllChanges}
+                    disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
+                  >
+                    Reset
+                  </button>
                 </div>
               </div>
             </div>

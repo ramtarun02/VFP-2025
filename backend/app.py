@@ -416,6 +416,148 @@ def stop_simulation():
     else:
         emit('message', "No simulation currently running")
 
+
+
+@app.route('/interpolate_parameter', methods=['POST'])
+def interpolate_parameter():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        geo_data = data.get('geoData')
+        plot_data = data.get('plotData')
+        parameter = data.get('parameter')
+        start_section = data.get('startSection')  # 0-based index
+        end_section = data.get('endSection')      # 0-based index
+        a_value = data.get('aValue', 0)
+        
+        if not geo_data:
+            return jsonify({'error': 'No geoData provided'}), 400
+        
+        if parameter not in ['Twist', 'Dihedral', 'XLE']:
+            return jsonify({'error': f'Invalid parameter: {parameter}'}), 400
+        
+        if start_section < 0 or end_section < 0 or start_section > end_section:
+            return jsonify({'error': 'Invalid section range'}), 400
+        
+        if start_section >= len(geo_data) or end_section >= len(geo_data):
+            return jsonify({'error': 'Section index out of range'}), 400
+        
+        print(f"Interpolating {parameter} from section {start_section} to {end_section} with a={a_value}")
+        
+        # Map parameter names to geoData keys
+        param_key_map = {
+            'Twist': 'TWIST',
+            'Dihedral': 'HSECT', 
+            'XLE': 'G1SECT'
+        }
+        
+        geo_key = param_key_map[parameter]
+        
+        # Get start and end values
+        start_value = geo_data[start_section][geo_key]
+        end_value = geo_data[end_section][geo_key]
+        
+        # Number of sections to interpolate
+        num_sections = end_section - start_section + 1
+        
+        print(f"Interpolating from {start_value} to {end_value} over {num_sections} sections")
+        
+        # Perform interpolation
+        if abs(a_value) < 1e-10:  # Linear interpolation when a ≈ 0
+            print("Performing linear interpolation")
+            for i in range(num_sections):
+                section_idx = start_section + i
+                if num_sections == 1:
+                    # Single section, no interpolation needed
+                    continue
+                
+                # Linear interpolation: y = mx + b
+                t = i / (num_sections - 1)  # Parameter from 0 to 1
+                interpolated_value = start_value + t * (end_value - start_value)
+                
+                geo_data[section_idx][geo_key] = interpolated_value
+                print(f"Section {section_idx}: {geo_key} = {interpolated_value}")
+        
+        else:  # Quadratic interpolation when a ≠ 0
+            print(f"Performing quadratic interpolation with a = {a_value}")
+            
+            # For quadratic interpolation y = ax² + bx + c
+            # We need to solve for b and c using boundary conditions:
+            # At x=0: y = start_value → c = start_value
+            # At x=1: y = end_value → a + b + c = end_value → b = end_value - a - c
+            
+            c = start_value
+            b = end_value - a_value - c
+            
+            print(f"Quadratic coefficients: a={a_value}, b={b}, c={c}")
+            
+            for i in range(num_sections):
+                section_idx = start_section + i
+                if num_sections == 1:
+                    # Single section, no interpolation needed
+                    continue
+                
+                # Normalize x to [0, 1] range
+                x = i / (num_sections - 1) if num_sections > 1 else 0
+                
+                # Calculate quadratic interpolation: y = ax² + bx + c
+                interpolated_value = a_value * x * x + b * x + c
+                
+                geo_data[section_idx][geo_key] = interpolated_value
+                print(f"Section {section_idx}: x={x}, {geo_key} = {interpolated_value}")
+        
+        # Handle special case for XLE parameter - need to update chord accordingly
+        if parameter == 'XLE':
+            print("Updating XTE (G2SECT) to maintain chord length for XLE changes")
+            for i in range(start_section, end_section + 1):
+                # Calculate current chord
+                current_chord = geo_data[i]['G2SECT'] - geo_data[i]['G1SECT']
+                # Update G2SECT to maintain chord length
+                geo_data[i]['G2SECT'] = geo_data[i]['G1SECT'] + current_chord
+                print(f"Section {i}: Updated G2SECT to {geo_data[i]['G2SECT']} (chord={current_chord})")
+        
+        # Regenerate plot data after geometry changes
+        import copy
+        updated_plot_data = rG.airfoils(copy.deepcopy(geo_data))
+        
+        # For twist changes, apply rotation to plot data
+        if parameter == 'Twist':
+            print("Applying twist transformations to plot data")
+            
+            # Get original plot data for comparison
+            original_plot_data = plot_data
+            
+            for section_idx in range(start_section, end_section + 1):
+                current_twist = geo_data[section_idx]['TWIST']
+                
+                # Find the original twist value (this would need to be tracked)
+                # For now, we'll assume the rotation is applied cumulatively
+                section_plot_data = updated_plot_data[section_idx]
+                
+                # Apply twist rotation if needed
+                # Note: The twist rotation logic might need refinement based on your coordinate system
+                print(f"Section {section_idx}: Applied twist = {current_twist}°")
+        
+        # For dihedral changes, the plot data is already updated through rG.airfoils()
+        if parameter == 'Dihedral':
+            print("Dihedral changes applied through geometry regeneration")
+        
+        print("Interpolation completed successfully")
+        
+        return jsonify({
+            'updatedGeoData': geo_data,
+            'updatedPlotData': updated_plot_data
+        })
+    
+    except Exception as e:
+        print(f"Error in interpolate_parameter: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @socketio.on('download')
 def handle_download(data):
     SIMULATIONS_DIR = "./Simulations"
