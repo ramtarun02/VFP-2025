@@ -28,6 +28,9 @@ function PostProcessing() {
   const [meshData, setMeshData] = useState(null);
   const [showMesh, setShowMesh] = useState(false);
   const resizeRef = useRef(null);
+  const [showSpanwiseDistribution, setShowSpanwiseDistribution] = useState(false);
+  const [selectedSpanwiseCoeff, setSelectedSpanwiseCoeff] = useState('CL');
+  const [spanwiseData, setSpanwiseData] = useState(null);
 
   // Coefficients data
   const [coefficients, setCoefficients] = useState({
@@ -659,6 +662,156 @@ function PostProcessing() {
     setMeshData(meshPlotData);
   };
 
+  useEffect(() => {
+    if (selectedLevel && selectedSpanwiseCoeff && parsedCpData && showSpanwiseDistribution) {
+      generateSpanwisePlotData();
+    }
+  }, [selectedLevel, selectedSpanwiseCoeff, parsedCpData, showSpanwiseDistribution]);
+
+
+  // Add spanwise distribution button handler
+  const handleSpanwiseDistributionClick = () => {
+    if (!parsedCpData || !selectedLevel) {
+      alert('Please select CP file and choose a level first.');
+      return;
+    }
+
+    if (showSpanwiseDistribution) {
+      setShowSpanwiseDistribution(false);
+      setSpanwiseData(null);
+    } else {
+      setShowSpanwiseDistribution(true);
+      setShowMesh(false);
+      setMeshData(null);
+      generateSpanwisePlotData();
+    }
+  };
+
+  // Generate spanwise distribution plot data
+  const generateSpanwisePlotData = () => {
+    console.log('generateSpanwisePlotData called');
+
+    if (!parsedCpData || !selectedLevel) {
+      console.log('Missing CP data or level selection');
+      return;
+    }
+
+    const levelIndex = parseInt(selectedLevel) - 1;
+    console.log('levelIndex:', levelIndex);
+
+    if (levelIndex < 0 || levelIndex >= parsedCpData.levels.length) {
+      console.log('Invalid level index:', levelIndex, 'Available levels:', parsedCpData.levels.length);
+      return;
+    }
+
+    const level = parsedCpData.levels[levelIndex];
+    const sections = level.sections;
+    console.log('CP Level:', level);
+    console.log('Sections count:', sections?.length);
+
+    if (!sections || sections.length === 0) {
+      console.log('No sections found in level');
+      return;
+    }
+
+    // Extract YAVE and coefficient values from section headers
+    const yaveValues = [];
+    const coeffValues = [];
+
+    sections.forEach((section, index) => {
+      console.log(`Processing section ${index + 1} header:`, section.sectionHeader);
+
+      // Parse section header for YAVE and coefficient values
+      const yaveMatch = section.sectionHeader.match(/YAVE=\s*([\d.-]+)/);
+      let coeffMatch;
+
+      switch (selectedSpanwiseCoeff) {
+        case 'CL':
+          coeffMatch = section.sectionHeader.match(/CL=\s*([\d.-]+)/);
+          break;
+        case 'CD':
+          coeffMatch = section.sectionHeader.match(/CD=\s*([\d.-]+)/);
+          break;
+        case 'CM':
+          coeffMatch = section.sectionHeader.match(/CM=\s*([\d.-]+)/);
+          break;
+        default:
+          coeffMatch = section.sectionHeader.match(/CL=\s*([\d.-]+)/);
+      }
+
+      if (yaveMatch && coeffMatch) {
+        const yave = parseFloat(yaveMatch[1]);
+        const coeff = parseFloat(coeffMatch[1]);
+
+        console.log(`Section ${index + 1}: YAVE=${yave}, ${selectedSpanwiseCoeff}=${coeff}`);
+
+        yaveValues.push(yave);
+        coeffValues.push(coeff);
+      } else {
+        console.log(`Section ${index + 1}: Missing YAVE or ${selectedSpanwiseCoeff} in header`);
+      }
+    });
+
+    console.log('YAVE values:', yaveValues);
+    console.log(`${selectedSpanwiseCoeff} values:`, coeffValues);
+
+    if (yaveValues.length === 0 || coeffValues.length === 0) {
+      console.log('No valid data found for spanwise distribution');
+      return;
+    }
+
+    // Create plot data
+    const plotColor = selectedSpanwiseCoeff === 'CL' ? 'blue' :
+      selectedSpanwiseCoeff === 'CD' ? 'red' : 'green';
+
+    const spanwisePlotData = [{
+      x: yaveValues,
+      y: coeffValues,
+      type: 'scatter',
+      mode: 'lines+markers',
+      line: { color: plotColor, width: 2 },
+      marker: { color: plotColor, size: 6 },
+      name: `${selectedSpanwiseCoeff} vs YAVE`
+    }];
+
+    const spanwisePlotLayout = {
+      title: `Spanwise Distribution - ${selectedSpanwiseCoeff} vs YAVE (Level ${selectedLevel})`,
+      xaxis: {
+        title: 'YAVE',
+        showgrid: true,
+        zeroline: true,
+        showticklabels: true
+      },
+      yaxis: {
+        title: selectedSpanwiseCoeff,
+        showgrid: true,
+        zeroline: true,
+        showticklabels: true
+      },
+      margin: { l: 60, r: 40, t: 60, b: 60 },
+      showlegend: false,
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white'
+    };
+
+    const spanwiseFullData = {
+      data: spanwisePlotData,
+      layout: spanwisePlotLayout,
+      config: {
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+      }
+    };
+
+    console.log('Generated spanwise plot data');
+    setSpanwiseData(spanwiseFullData);
+  };
+
+
+
+
+
   // Generate 2D plot data
   const generatePlotData = () => {
     if (!parsedCpData || !selectedLevel || !selectedSection) return;
@@ -845,18 +998,40 @@ function PostProcessing() {
             const sectionLine = lines[lineIndex].trim();
 
             // Check if we've reached the next level
-            if (sectionLine.startsWith('LEV=')) {
+            if (sectionLine.startsWith('LEV= ')) {
               lineIndex--;
               break;
             }
 
             // Check for section header
-            if (sectionLine.startsWith('J=')) {
+            if (sectionLine.startsWith('J= ')) {
               const section = {
                 sectionHeader: sectionLine,
                 mainTable: [],
-                vortexSheetTable: []
+                vortexSheetTable: [],
+                coefficients: {}
               };
+
+
+              // Parse coefficient values from section header
+              const yaveMatch = sectionLine.match(/YAVE=\s*([\d.-]+)/);
+              const clMatch = sectionLine.match(/CL=\s*([\d.-]+)/);
+              const cdMatch = sectionLine.match(/CD=\s*([\d.-]+)/);
+              const cmMatch = sectionLine.match(/CM=\s*([\d.-]+)/);
+              const chordMatch = sectionLine.match(/CHORD=\s*([\d.-]+)/);
+              const twistMatch = sectionLine.match(/TWIST=\s*([\d.-]+)/);
+              const gamMatch = sectionLine.match(/GAM=\s*([\d.-]+)/);
+
+              if (yaveMatch) section.coefficients.YAVE = parseFloat(yaveMatch[1]);
+              if (clMatch) section.coefficients.CL = parseFloat(clMatch[1]);
+              if (cdMatch) section.coefficients.CD = parseFloat(cdMatch[1]);
+              if (cmMatch) section.coefficients.CM = parseFloat(cmMatch[1]);
+              if (chordMatch) section.coefficients.CHORD = parseFloat(chordMatch[1]);
+              if (twistMatch) section.coefficients.TWIST = parseFloat(twistMatch[1]);
+              if (gamMatch) section.coefficients.GAM = parseFloat(gamMatch[1]);
+
+              console.log(`Section coefficients extracted:`, section.coefficients);
+
 
               lineIndex++;
 
@@ -1457,6 +1632,33 @@ function PostProcessing() {
                 useResizeHandler={true}
               />
             </div>
+          ) : showSpanwiseDistribution && spanwiseData ? (
+            <>
+              <div className="spanwise-container">
+                <Plot
+                  data={spanwiseData.data}
+                  layout={spanwiseData.layout}
+                  config={spanwiseData.config}
+                  style={{ width: '100%', height: '100%' }}
+                  useResizeHandler={true}
+                />
+              </div>
+              {/* Bottom Canvas Area - Plot 2 */}
+              <div className="canvas-container bottom-canvas">
+                {plotData2 ? (
+                  <Plot
+                    data={plotData2.data}
+                    layout={plotData2.layout}
+                    config={plotData2.config}
+                    style={{ width: '100%', height: '100%' }}
+                    useResizeHandler={true}
+                  />
+                ) : (
+                  <div className="blank-plot-area"></div>
+                )}
+              </div>
+
+            </>
           ) : (
             <>
               {/* Top Canvas Area - Plot 1 */}
@@ -1492,6 +1694,7 @@ function PostProcessing() {
           )}
         </div>
 
+
         {/* Right Sidebar */}
         <div className="right-sidebar">
           {/* Controls Section */}
@@ -1524,7 +1727,7 @@ function PostProcessing() {
                 className="control-dropdown"
                 value={selectedPlotType}
                 onChange={(e) => setSelectedPlotType(e.target.value)}
-                disabled={showMesh}
+                disabled={showMesh || showSpanwiseDistribution}
               >
                 <option value="Mach">Mach</option>
                 <option value="Cp">Cp</option>
@@ -1546,14 +1749,19 @@ function PostProcessing() {
               </select>
             </div>
 
-            <div className="interval-section">
-              <label>Interval 3d plot:</label>
-              <input type="number" defaultValue="0" className="interval-input" />
-            </div>
+            <div className="spanwise-section">
+              <button
+                className={`control-btn spanwise-btn ${showSpanwiseDistribution ? 'active' : ''}`}
+                onClick={handleSpanwiseDistributionClick}
+              >
+                {showSpanwiseDistribution ? 'Hide Spanwise' : 'Spanwise Distribution'}
+              </button>
 
-            <div className="load-section">
-              <select className="control-dropdown">
+              <select className="control-dropdown" value={selectedSpanwiseCoeff} onChange={(e) => setSelectedSpanwiseCoeff(e.target.value)} disabled={!showSpanwiseDistribution}>
                 <option>Load</option>
+                <option>CL</option>
+                <option>CD</option>
+                <option>CM</option>
               </select>
             </div>
           </div>
