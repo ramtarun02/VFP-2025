@@ -417,6 +417,43 @@ def stop_simulation():
         emit('message', "No simulation currently running")
 
 
+# Add this to your backend Flask application
+@app.route('/boundary_layer_data', methods=['POST'])
+def boundary_layer_data():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if not file.filename.lower().endswith('.vis'):
+            return jsonify({'error': 'Please select a .vis file'}), 400
+        
+        # Save temporary file
+        temp_filename = f"temp_{file.filename}"
+        file.save(temp_filename)
+        
+        try:
+            # Use readVIS function from readVFP.py
+            from readVFP import readVIS
+            vis_data = readVIS(temp_filename)
+            
+            # Clean up temp file
+            os.remove(temp_filename)
+            
+            return jsonify(vis_data)
+            
+        except Exception as e:
+            # Clean up temp file if it exists
+            if os.path.exists(temp_filename):
+                os.remove(temp_filename)
+            raise e
+            
+    except Exception as e:
+        return jsonify({'error': f'Error processing VIS file: {str(e)}'}), 500
 
 @app.route('/interpolate_parameter', methods=['POST'])
 def interpolate_parameter():

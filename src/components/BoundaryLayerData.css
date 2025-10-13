@@ -1,0 +1,292 @@
+.boundary-layer-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #f5f5f5;
+}
+
+.boundary-layer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #2c3e50;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-left h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.header-right {
+    display: flex;
+    gap: 1rem;
+}
+
+.header-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.import-btn {
+    background-color: #27ae60;
+    color: white;
+}
+
+.import-btn:hover {
+    background-color: #219a52;
+}
+
+.back-btn {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.back-btn:hover {
+    background-color: #7f8c8d;
+}
+
+.boundary-layer-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.controls-sidebar {
+    width: 300px;
+    background-color: white;
+    border-right: 1px solid #ddd;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.control-section {
+    margin-bottom: 2rem;
+}
+
+.control-section h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 0.25rem;
+}
+
+.control-dropdown {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background-color: white;
+}
+
+.control-dropdown:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.file-info {
+    background-color: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 4px;
+    border-left: 4px solid #3498db;
+}
+
+.file-info p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.no-file {
+    color: #7f8c8d;
+    font-style: italic;
+    margin: 0;
+}
+
+.section-details {
+    background-color: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 4px;
+    border-left: 4px solid #27ae60;
+}
+
+.section-details p {
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.plot-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    background-color: white;
+    overflow: hidden;
+}
+
+.loading-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+}
+
+.loading-indicator p {
+    font-size: 1.2rem;
+    color: #3498db;
+}
+
+.error-message {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    color: #e74c3c;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    text-align: center;
+}
+
+.empty-state h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    color: #7f8c8d;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+}
+
+.import-button-large {
+    padding: 1rem 2rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.import-button-large:hover {
+    background-color: #2980b9;
+}
+
+/* Updated styles for the 5-plot grid with 1:1 aspect ratio */
+.plots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1rem;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    padding: 1rem;
+    overflow: auto;
+    justify-items: center;
+    align-items: start;
+}
+
+.plot-item {
+    width: 400px;
+    height: 400px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+    position: relative;
+}
+
+.plot-item:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Remove the previous grid spanning rule for first plot */
+.plot-item:nth-child(1) {
+    grid-column: auto;
+}
+
+/* Ensure plots maintain exact 1:1 aspect ratio */
+.plot-item>div {
+    width: 400px !important;
+    height: 400px !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1200px) {
+    .plots-grid {
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    }
+
+    .plot-item {
+        width: 350px;
+        height: 350px;
+    }
+
+    .plot-item>div {
+        width: 350px !important;
+        height: 350px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .boundary-layer-content {
+        flex-direction: column;
+    }
+
+    .controls-sidebar {
+        width: 100%;
+        max-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .plots-grid {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        padding: 0.5rem;
+    }
+
+    .plot-item {
+        width: 300px;
+        height: 300px;
+    }
+
+    .plot-item>div {
+        width: 300px !important;
+        height: 300px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .plot-item {
+        width: 280px;
+        height: 280px;
+    }
+
+    .plot-item>div {
+        width: 280px !important;
+        height: 280px !important;
+    }
+}

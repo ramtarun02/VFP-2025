@@ -1442,6 +1442,10 @@ function PostProcessing() {
     }
   };
 
+  const handleBoundaryLayerClick = () => {
+    navigate('/post-processing/boundary-layer', { state: { simulationFolder: simulationData } });
+  };
+
   // Render file explorer
   const renderFileExplorer = () => {
     console.log('Rendering file explorer with simulationData:', simulationData);
@@ -1705,7 +1709,7 @@ function PostProcessing() {
             >
               {showMesh ? 'Hide Mesh' : 'Mesh'}
             </button>
-            <button className="control-btn boundary-btn">Boundary Layer Data</button>
+            <button className="control-btn boundary-btn" onClick={handleBoundaryLayerClick}>Boundary Layer Data</button>
 
             <div className="dropdown-section">
               {/* Level Selection */}
