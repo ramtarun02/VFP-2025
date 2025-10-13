@@ -360,6 +360,13 @@ function BoundaryLayer() {
                                         <p><strong>Eta:</strong> {visData.levels[selectedLevel].sections[selectedSection].eta?.toFixed(5)}</p>
                                         <p><strong>Chord:</strong> {visData.levels[selectedLevel].sections[selectedSection].chord?.toFixed(5)}</p>
                                     </div>
+                                    <h3>Flow Conditions</h3>
+                                    <div className="flow-conditions">
+                                        <p><strong>Reynolds Number (Re):</strong> {visData.levels[selectedLevel].reynoldsNumber}</p>
+                                        <p><strong>Mach Number (Ma):</strong> {visData.levels[selectedLevel].machNumber}</p>
+                                        <p><strong>Angle of Attack (α):</strong> {visData.levels[selectedLevel].incidence}°</p>
+                                    </div>
+
                                 </div>
                             )}
                         </>
