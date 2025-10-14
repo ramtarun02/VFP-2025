@@ -233,6 +233,245 @@
 }
 
 
+
+/* Add these styles to your existing BoundaryLayerData.css file */
+
+/* Toggle Switch Styles */
+.toggle-container {
+    margin: 0.5rem 0;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.toggle-checkbox {
+    display: none;
+}
+
+.toggle-slider {
+    width: 50px;
+    height: 25px;
+    background-color: #ccc;
+    border-radius: 25px;
+    position: relative;
+    transition: background-color 0.3s;
+    margin-right: 0.5rem;
+}
+
+.toggle-slider::before {
+    content: '';
+    width: 21px;
+    height: 21px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+
+.toggle-checkbox:checked+.toggle-slider {
+    background-color: #3498db;
+}
+
+.toggle-checkbox:checked+.toggle-slider::before {
+    transform: translateX(25px);
+}
+
+.toggle-text {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+/* BL Velocity Profile Styles */
+.bl-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-group label {
+    font-weight: 500;
+    min-width: 40px;
+    color: #2c3e50;
+}
+
+.bl-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.bl-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.calculate-btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.calculate-btn:hover {
+    background-color: #2980b9;
+}
+
+/* Surface Selection */
+.surface-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.radio-label:hover {
+    background-color: #f8f9fa;
+}
+
+.radio-label input[type="radio"] {
+    margin-right: 0.5rem;
+}
+
+.radio-label input[type="radio"]:checked+span {
+    font-weight: 500;
+    color: #3498db;
+}
+
+/* Parameters Display */
+.parameters-display {
+    background-color: #2c3e50;
+    border-radius: 4px;
+    padding: 1rem;
+    color: white;
+}
+
+.param-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #34495e;
+}
+
+.param-item:last-child {
+    border-bottom: none;
+}
+
+.param-label {
+    font-weight: 500;
+    color: #ecf0f1;
+}
+
+.param-value {
+    font-family: 'Courier New', monospace;
+    background-color: #34495e;
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    color: #ecf0f1;
+    font-size: 0.85rem;
+}
+
+/* BL Profile Container */
+.bl-profile-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.bl-profile-title {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.bl-profile-title h2 {
+    color: #3498db;
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.bl-plots-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    flex: 1;
+    height: 100%;
+}
+
+.bl-plot-item {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-plot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #7f8c8d;
+    font-style: italic;
+    text-align: center;
+    padding: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .bl-plots-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .bl-inputs {
+        gap: 0.5rem;
+    }
+
+    .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .input-group label {
+        min-width: auto;
+    }
+}
+
+
+
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 1200px) {
     .plots-grid {
