@@ -7,6 +7,6 @@ numpy
 scipy
 pandas
 matplotlib
-gunicorn==21.2.0
-eventlet==0.33.3
-Werkzeug==2.3.7
+gunicorn
+eventlet
+Werkzeug
