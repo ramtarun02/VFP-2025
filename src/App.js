@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Routers, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import LandingPage from "./components/LandingPage";
 import GeometryModule from "./components/GeometryModule";
 import RunSolver from "./components/runSolver/runSolver";
@@ -14,16 +14,18 @@ import BoundaryLayer from "./components/BoundaryLayerData";
 function App() {
   return (
     <FormDataProvider>
-      <Routes>
-        <Route path="/home" element={<LandingPage />} />
-        <Route path="/geometry" element={<GeometryModule />} />
-        <Route path="/run-solver" element={<RunSolver />} />
-        <Route path="/results" element={<Solver />} />
-        <Route path="/post-processing" element={<PostProcessing />} />
-        <Route path="/post-processing/prowim" element={<ProWiM />} />
-        <Route path="/post-processing/boundary-layer" element={<BoundaryLayer />} />
-        <Route path="/simulation-run" element={<SimulationRun />} />
-      </Routes>
+      <Router basename="/VFP-2025">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/geometry" element={<GeometryModule />} />
+          <Route path="/run-solver" element={<RunSolver />} />
+          <Route path="/results" element={<Solver />} />
+          <Route path="/post-processing" element={<PostProcessing />} />
+          <Route path="/post-processing/prowim" element={<ProWiM />} />
+          <Route path="/post-processing/boundary-layer" element={<BoundaryLayer />} />
+          <Route path="/simulation-run" element={<SimulationRun />} />
+        </Routes>
+      </Router>
     </FormDataProvider>
   );
 }

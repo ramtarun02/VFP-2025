@@ -7,7 +7,7 @@ const getBaseURL = () => {
         return 'http://127.0.0.1:5000';
     }
 
-    const prodURL = process.env.REACT_APP_API_URL || 'https://your-production-domain.com';
+    const prodURL = process.env.REACT_APP_API_URL || 'https://vfp-2025.onrender.com';
     console.log('Using production URL:', prodURL);
     return prodURL;
 };
