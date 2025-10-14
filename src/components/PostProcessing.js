@@ -1452,7 +1452,7 @@ function PostProcessing() {
   };
 
   const handleBoundaryLayerClick = () => {
-    navigate('/post-processing/boundary-layer', { state: { simulationFolder: simulationData } });
+    navigate('/post-processing/boundary-layer', { state: { simulationFolder: simulationData, simName: simulationData?.simName } });
   };
 
   // Render file explorer

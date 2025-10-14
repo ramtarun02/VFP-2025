@@ -448,6 +448,72 @@
     padding: 2rem;
 }
 
+
+.vis-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    background-color: #f9f9f9;
+}
+
+.vis-file-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.vis-file-item:hover {
+    background-color: #f0f8ff;
+    border-color: #2196f3;
+    transform: translateY(-1px);
+}
+
+.vis-file-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.vis-file-name {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vis-file-selected {
+    color: #4caf50;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.hint {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-top: 5px;
+}
+
+.no-file {
+    color: #666;
+}
+
+.no-file p {
+    margin: 5px 0;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .bl-plots-grid {

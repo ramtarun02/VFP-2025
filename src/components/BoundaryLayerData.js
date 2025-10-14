@@ -3,8 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import './BoundaryLayerData.css';
 
-import { fetchAPI } from '../utils/fetch'; // ADD THIS LINE
-
+import { fetchAPI } from '../utils/fetch';
 
 function BoundaryLayer() {
     const navigate = useNavigate();
@@ -18,10 +17,15 @@ function BoundaryLayer() {
         delta: null,
         hbar: null,
         cf: null,
-        beta: null
+        beta: null,
+        cp: null
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // Add new state for available .vis files from simulation folder
+    const [simulationData, setSimulationData] = useState(null);
+    const [availableVisFiles, setAvailableVisFiles] = useState([]);
 
     // BL Velocity Profile states
     const [showBLProfile, setShowBLProfile] = useState(false);
@@ -42,7 +46,48 @@ function BoundaryLayer() {
         crossflow: null
     });
 
-    // Handle file import
+    // Process simulation data on component mount to find .vis files
+    useEffect(() => {
+        console.log('Boundary Layer - Location state received:', location.state);
+
+        if (location.state && location.state.simulationFolder) {
+            const receivedData = location.state.simulationFolder;
+            console.log('Boundary Layer - Raw simulation folder data:', receivedData);
+
+            setSimulationData(receivedData);
+
+            // Scan for .vis files in the simulation folder
+            if (receivedData && receivedData.files) {
+                const visFiles = [];
+
+                // Check if files is an object with different file types
+                if (typeof receivedData.files === 'object' && !Array.isArray(receivedData.files)) {
+                    // Look for .vis files in different file type categories
+                    Object.entries(receivedData.files).forEach(([fileType, fileList]) => {
+                        if (Array.isArray(fileList)) {
+                            fileList.forEach(file => {
+                                if (file.name && file.name.toLowerCase().endsWith('.vis')) {
+                                    visFiles.push(file);
+                                }
+                            });
+                        }
+                    });
+                } else if (Array.isArray(receivedData.files)) {
+                    // If files is an array, search directly
+                    receivedData.files.forEach(file => {
+                        if (file.name && file.name.toLowerCase().endsWith('.vis')) {
+                            visFiles.push(file);
+                        }
+                    });
+                }
+
+                console.log('Found .vis files:', visFiles);
+                setAvailableVisFiles(visFiles);
+            }
+        }
+    }, [location.state]);
+
+    // Handle file import from computer
     const handleImportVis = () => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -51,50 +96,105 @@ function BoundaryLayer() {
         input.onchange = async (event) => {
             const file = event.target.files[0];
             if (file) {
-                setLoading(true);
-                setError(null);
-
-                try {
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    const response = await fetchAPI('/boundary_layer_data', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    console.log('VIS data received:', data);
-
-                    setVisData(data);
-
-                    // Update sections dropdown with level1 sections by default
-                    if (data.levels && data.levels.level1 && data.levels.level1.sections) {
-                        const sectionOptions = Object.keys(data.levels.level1.sections)
-                            .map(sectionKey => ({
-                                value: sectionKey,
-                                label: `Section ${data.levels.level1.sections[sectionKey].spanJ2}`,
-                                data: data.levels.level1.sections[sectionKey],
-                                spanJ2: data.levels.level1.sections[sectionKey].spanJ2
-                            }))
-                            .sort((a, b) => a.spanJ2 - b.spanJ2);
-                        setSections(sectionOptions);
-                    }
-
-                } catch (error) {
-                    console.error('Error parsing VIS file:', error);
-                    setError(`Error loading VIS file: ${error.message}`);
-                } finally {
-                    setLoading(false);
-                }
+                await processVisFile(file, true); // true indicates local file
             }
         };
 
         input.click();
+    };
+
+    // Handle selection of .vis file from simulation folder
+    const handleSelectVisFromFolder = async (visFile) => {
+        console.log('Selected .vis file from folder:', visFile);
+        setLoading(true);
+        setError(null);
+
+        try {
+            // Fetch file content from server
+            const simName = simulationData?.simName || 'unknown';
+            console.log('Using simulation name:', simName);
+            console.log('File path:', visFile.path || visFile.name);
+
+            const response = await fetchAPI(`/get_file_content`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    simName: simName,
+                    filePath: visFile.path || visFile.name
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            }
+
+            const content = await response.text();
+            console.log('VIS file content fetched successfully, length:', content.length);
+
+            // Create a File object from the content
+            const blob = new Blob([content], { type: 'text/plain' });
+            const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
+
+            await processVisFile(fileObj, false, visFile.name); // false indicates server file
+
+        } catch (error) {
+            console.error('Error fetching .vis file from server:', error);
+            setError(`Error loading .vis file: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Common function to process .vis files (both local and server)
+    const processVisFile = async (file, isLocalFile = true, originalFileName = null) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetchAPI('/boundary_layer_data', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('VIS data received:', data);
+
+            // Add the original filename for server files
+            if (!isLocalFile && originalFileName) {
+                data.fileName = originalFileName;
+            }
+
+            setVisData(data);
+
+            // Update sections dropdown with level1 sections by default
+            if (data.levels && data.levels.level1 && data.levels.level1.sections) {
+                const sectionOptions = Object.keys(data.levels.level1.sections)
+                    .map(sectionKey => ({
+                        value: sectionKey,
+                        label: `Section ${data.levels.level1.sections[sectionKey].spanJ2}`,
+                        data: data.levels.level1.sections[sectionKey],
+                        spanJ2: data.levels.level1.sections[sectionKey].spanJ2
+                    }))
+                    .sort((a, b) => a.spanJ2 - b.spanJ2);
+                setSections(sectionOptions);
+            }
+
+        } catch (error) {
+            console.error('Error processing VIS file:', error);
+            setError(`Error processing VIS file: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Update sections when level changes
@@ -117,7 +217,8 @@ function BoundaryLayer() {
                     delta: null,
                     hbar: null,
                     cf: null,
-                    beta: null
+                    beta: null,
+                    cp: null
                 });
             }
         }
@@ -621,7 +722,7 @@ function BoundaryLayer() {
             config: commonConfig
         };
 
-        // 5. Cp Plot
+        // 6. Cp Plot
         const CpSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['Cp']);
         const CpPlot = {
             data: [
@@ -663,8 +764,6 @@ function BoundaryLayer() {
             config: commonConfig
         };
 
-
-
         setPlotData({
             theta: thetaPlot,
             delta: deltaPlot,
@@ -705,6 +804,29 @@ function BoundaryLayer() {
             <div className="boundary-layer-content">
                 {/* Controls Sidebar */}
                 <div className="controls-sidebar">
+                    {/* Available .vis Files Section */}
+                    {availableVisFiles.length > 0 && (
+                        <div className="control-section">
+                            <h3>Available .vis Files</h3>
+                            <div className="vis-files-list">
+                                {availableVisFiles.map((visFile, index) => (
+                                    <div
+                                        key={index}
+                                        className="vis-file-item"
+                                        onClick={() => handleSelectVisFromFolder(visFile)}
+                                        title={`Click to load ${visFile.name}`}
+                                    >
+                                        <span className="vis-file-icon">📊</span>
+                                        <span className="vis-file-name">{visFile.name}</span>
+                                        {visData && visData.fileName === visFile.name && (
+                                            <span className="vis-file-selected">✓</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="control-section">
                         <h3>File Information</h3>
                         {visData ? (
@@ -720,7 +842,14 @@ function BoundaryLayer() {
                                 )}
                             </div>
                         ) : (
-                            <p className="no-file">No .vis file loaded</p>
+                            <div className="no-file">
+                                <p>No .vis file loaded</p>
+                                {availableVisFiles.length > 0 ? (
+                                    <p className="hint">Select a .vis file from above or import a new one</p>
+                                ) : (
+                                    <p className="hint">Import a .vis file to get started</p>
+                                )}
+                            </div>
                         )}
                     </div>
 
@@ -902,14 +1031,25 @@ function BoundaryLayer() {
                     {!visData && !loading && !error && (
                         <div className="empty-state">
                             <h2>Welcome to Boundary Layer Data Visualization</h2>
-                            <p>Import a .vis file to get started</p>
-                            <button onClick={handleImportVis} className="import-button-large">
-                                Import .vis File
-                            </button>
+                            {availableVisFiles.length > 0 ? (
+                                <div>
+                                    <p>Select a .vis file from the available files above, or import a new one</p>
+                                    <button onClick={handleImportVis} className="import-button-large">
+                                        Import New .vis File
+                                    </button>
+                                </div>
+                            ) : (
+                                <div>
+                                    <p>Import a .vis file to get started</p>
+                                    <button onClick={handleImportVis} className="import-button-large">
+                                        Import .vis File
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {/* Default 5-plot view */}
+                    {/* Default 6-plot view */}
                     {visData && !showBLProfile && plotData.theta && (
                         <div className="plots-grid">
                             <div className="plot-item">
@@ -971,7 +1111,6 @@ function BoundaryLayer() {
                                     useResizeHandler={true}
                                 />
                             </div>
-
                         </div>
                     )}
 

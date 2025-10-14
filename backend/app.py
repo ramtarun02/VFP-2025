@@ -688,6 +688,8 @@ def handle_get_simulation_folder(data):
             'message': str(e)
         })
 
+    
+@app.route('/get_file_content', methods=['POST'])
 def get_file_content():
     try:
         data = request.get_json()
