@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Plot from 'react-plotly.js';
 import "./PostProcessing.css";
+import { common } from "@material-ui/core/colors";
 
 function PostProcessing() {
   const navigate = useNavigate();
@@ -861,16 +862,23 @@ function PostProcessing() {
     const plot1Layout = {
       title: `${selectedPlotType} vs X/C - Section ${selectedSection}`,
       xaxis: {
-        title: 'X/C',
+        title: {
+          text: 'X/C',
+          font: { size: 14, family: 'Arial, sans-serif' }
+        },
         showgrid: true,
         zeroline: true,
         showticklabels: true
       },
       yaxis: {
-        title: yAxisTitle,
+        title: {
+          text: selectedPlotType === 'Cp' ? 'Coefficient of Pressure (CP)' : 'Mach',
+          font: { size: 14, family: 'Arial, sans-serif' }
+        },
         showgrid: true,
         zeroline: true,
-        showticklabels: true
+        showticklabels: true,
+        autorange: selectedPlotType === 'Cp' ? 'reversed' : true
       },
       margin: { l: 60, r: 40, t: 60, b: 60 },
       showlegend: false,
