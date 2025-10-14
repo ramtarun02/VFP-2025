@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import './BoundaryLayerData.css';
 
+import { fetchAPI } from '../utils/fetch'; // ADD THIS LINE
+
+
 function BoundaryLayer() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -55,7 +58,7 @@ function BoundaryLayer() {
                     const formData = new FormData();
                     formData.append('file', file);
 
-                    const response = await fetch('http://127.0.0.1:5000/boundary_layer_data', {
+                    const response = await fetchAPI('/boundary_layer_data', {
                         method: 'POST',
                         body: formData
                     });

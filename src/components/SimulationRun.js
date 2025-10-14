@@ -17,6 +17,7 @@ import { useContext } from "react";
 import FormDataContext from "./FormDataContext";
 import "./SimulationRun.css";
 
+import { createSocket } from '../utils/socket';
 
 // Register Chart.js components
 ChartJS.register(
@@ -71,7 +72,7 @@ const SimulationRun = () => {
       return;
     }
 
-    const newSocket = io("http://127.0.0.1:5000", {
+    const newSocket = createSocket({
       pingTimeout: 300000,  // 5 minutes
       pingInterval: 60000   // 1 minute
     });
@@ -89,7 +90,7 @@ const SimulationRun = () => {
     });
 
     newSocket.on("message", (data) => {
-      console.log("Message from server:", data);
+      // console.log("Message from server:", data);
       setMessages((prev) => [...prev, data]);
       parseResidualData(data); // Parse for residual data
     });

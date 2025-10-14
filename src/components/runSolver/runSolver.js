@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import "./runSolver.css";
 import DragNDrop from "./DragNDrop";
 
+import { fetchAPI } from '../../utils/fetch';
+
 function RunSolver() {
   const [simName, setsimName] = useState("");
   const [mach, setMach] = useState("");
@@ -64,7 +66,7 @@ function RunSolver() {
 
       setFormData(formData);
 
-      const response = await fetch("http://127.0.1:5000/start-vfp", {
+      const response = await fetchAPI("/start-vfp", {
         method: "POST",
         body: formData,
       });

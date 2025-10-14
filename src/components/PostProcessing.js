@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Plot from 'react-plotly.js';
 import "./PostProcessing.css";
 import { common } from "@material-ui/core/colors";
+import { fetchAPI } from '../utils/fetch';
 
 function PostProcessing() {
   const navigate = useNavigate();
@@ -111,7 +112,7 @@ function PostProcessing() {
       console.log('Using simulation name:', simName);
       console.log('File path:', file.path);
 
-      const response = await fetch(`http://127.0.0.1:5000/get_file_content`, {
+      const response = await fetchAPI(`/get_file_content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -14,6 +14,11 @@ import {
   Legend,
 } from 'chart.js';
 
+import { fetchAPI } from '../utils/fetch';
+
+
+
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -150,7 +155,7 @@ function PropellerWingForm() {
       console.log('Using simulation name:', simName);
       console.log('File path:', file.path);
 
-      const response = await fetch(`http://127.0.0.1:5000/get_file_content`, {
+      const response = await fetchAPI(`/get_file_content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -360,7 +365,7 @@ function PropellerWingForm() {
         KS00: arrayInputs.KS00
       };
 
-      const response = await fetch("http://localhost:5000/prowim-compute", {
+      const response = await fetchAPI("/prowim-compute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

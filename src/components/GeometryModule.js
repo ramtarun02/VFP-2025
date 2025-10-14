@@ -3,7 +3,9 @@ import Plot3D from './Plot3D';
 import Plot2D from './Plot2D';
 import "./GeometryModule.css";
 import { useNavigate } from "react-router-dom";
+import { fetchAPI } from '../utils/fetch';
 import { reverse } from 'd3';
+import { AArrowDown } from 'lucide-react';
 
 function GeometryModule() {
   const [geoFiles, setGeoFiles] = useState([]); // Array to store multiple GEO files
@@ -79,7 +81,7 @@ function GeometryModule() {
     });
 
     try {
-      const response = await fetch('http://127.0.1:5000/import-geo', {
+      const response = await fetchAPI('/import-geo', {
         method: 'POST',
         body: formData,
       });
@@ -146,7 +148,7 @@ function GeometryModule() {
       const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
       const originalFilename = selectedGeoFile.fullName || `${selectedGeoFile.name}.GEO`;
 
-      const response = await fetch('http://127.0.0.1:5000/export-geo', {
+      const response = await fetchAPI('/export-geo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +305,7 @@ function GeometryModule() {
   const handleImproveSettingsChange = (field, value) => {
     setImproveSettings(prev => ({
       ...prev,
-      [field]: value
+      [field]: field === 'aValue' ? parseFloat(value) || 0 : value
     }));
   };
 
@@ -329,8 +331,10 @@ function GeometryModule() {
       return;
     }
 
+    const numericAValue = typeof aValue === 'number' ? aValue : parseFloat(aValue) || 0;
+
     try {
-      const response = await fetch('http://127.0.0.1:5000/interpolate_parameter', {
+      const response = await fetchAPI('/interpolate_parameter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -339,7 +343,7 @@ function GeometryModule() {
           parameter: selectedParameter,
           startSection: startSection - 1, // Convert to 0-based index
           endSection: endSection - 1, // Convert to 0-based index
-          aValue: parseFloat(aValue)
+          aValue: numericAValue
         }),
       });
 
@@ -448,7 +452,7 @@ function GeometryModule() {
     }
 
     try {
-      const response = await fetch('http://127.0.1:5000/compute_desired', {
+      const response = await fetchAPI('/compute_desired', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -989,7 +993,8 @@ function GeometryModule() {
                       className="input-field"
                       value={improveSettings.aValue}
                       onChange={(e) => handleImproveSettingsChange('aValue', e.target.value)}
-                      step="0.1"
+                      step="0.5"
+                      placeholder='0.0'
                     />
                   </div>
                 </div>
