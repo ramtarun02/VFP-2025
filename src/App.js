@@ -15,7 +15,7 @@ function App() {
   return (
     <FormDataProvider>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/home" element={<LandingPage />} />
         <Route path="/geometry" element={<GeometryModule />} />
         <Route path="/run-solver" element={<RunSolver />} />
         <Route path="/results" element={<Solver />} />
