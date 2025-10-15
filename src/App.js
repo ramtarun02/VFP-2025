@@ -14,7 +14,7 @@ import BoundaryLayer from "./components/BoundaryLayerData";
 function App() {
   return (
     <FormDataProvider>
-      <Router basename="/VFP-2025">
+      <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/geometry" element={<GeometryModule />} />
