@@ -18,7 +18,7 @@ function LandingPage() {
         </Link>
 
         <Link to="/run-solver" className="module">
-          <img src="solver.png" alt="Run VFP Solver" className="module-image" />
+          <img src="solver.PNG" alt="Run VFP Solver" className="module-image" />
           <p className="module-title">RUN VFP SOLVER</p>
         </Link>
 
