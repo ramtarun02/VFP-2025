@@ -103,42 +103,50 @@ function BoundaryLayer() {
         input.click();
     };
 
-    // Handle selection of .vis file from simulation folder
+
+    // Update the handleSelectVisFromFolder function
     const handleSelectVisFromFolder = async (visFile) => {
         console.log('Selected .vis file from folder:', visFile);
         setLoading(true);
         setError(null);
 
         try {
-            // Fetch file content from server
-            const simName = simulationData?.simName || 'unknown';
-            console.log('Using simulation name:', simName);
-            console.log('File path:', visFile.path || visFile.name);
+            // Check if the file has content property (already uploaded to server)
+            if (visFile.content) {
+                // File content is already available, process directly
+                const blob = new Blob([visFile.content], { type: 'text/plain' });
+                const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
+                await processVisFile(fileObj, false, visFile.name);
+            } else {
+                // File needs to be fetched from server
+                const simName = simulationData?.simName || 'unknown';
+                console.log('Using simulation name:', simName);
+                console.log('File path:', visFile.path || visFile.name);
 
-            const response = await fetchAPI(`/get_file_content`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    simName: simName,
-                    filePath: visFile.path || visFile.name
-                })
-            });
+                const response = await fetchAPI(`/get_file_content`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        simName: simName,
+                        filePath: visFile.path || visFile.name
+                    })
+                });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+
+                const content = await response.text();
+                console.log('VIS file content fetched successfully, length:', content.length);
+
+                const blob = new Blob([content], { type: 'text/plain' });
+                const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
+
+                await processVisFile(fileObj, false, visFile.name);
             }
-
-            const content = await response.text();
-            console.log('VIS file content fetched successfully, length:', content.length);
-
-            // Create a File object from the content
-            const blob = new Blob([content], { type: 'text/plain' });
-            const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
-
-            await processVisFile(fileObj, false, visFile.name); // false indicates server file
 
         } catch (error) {
             console.error('Error fetching .vis file from server:', error);
@@ -147,6 +155,8 @@ function BoundaryLayer() {
             setLoading(false);
         }
     };
+
+
 
     // Common function to process .vis files (both local and server)
     const processVisFile = async (file, isLocalFile = true, originalFileName = null) => {
