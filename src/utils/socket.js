@@ -4,7 +4,7 @@ const getSocketURL = () => {
     if (process.env.NODE_ENV === 'development') {
         return 'http://127.0.0.1:5000';
     }
-    return process.env.REACT_APP_WS_URL || 'https://vfp-2025.onrender.com';
+    return process.env.REACT_APP_WS_URL || 'vfp-solver-gngfaahkh2fkbbhh.uksouth-01.azurewebsites.net';
 };
 
 // Create socket connection function

@@ -7,7 +7,7 @@ const getBaseURL = () => {
         return 'http://127.0.0.1:5000';
     }
 
-    const prodURL = process.env.REACT_APP_API_URL || 'https://vfp-2025.onrender.com';
+    const prodURL = process.env.REACT_APP_API_URL || 'vfp-solver-gngfaahkh2fkbbhh.uksouth-01.azurewebsites.net';
     console.log('Using production URL:', prodURL);
     return prodURL;
 };
