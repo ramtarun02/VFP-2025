@@ -7,10 +7,12 @@ const getBaseURL = () => {
         return 'http://127.0.0.1:5000';
     }
 
-    const prodURL = process.env.REACT_APP_API_URL || 'vfp-solver-gngfaahkh2fkbbhh.uksouth-01.azurewebsites.net';
-    console.log('Using production URL:', prodURL);
-    return prodURL;
+    // Fix: Add https:// protocol for Azure deployment
+    const prodURL = process.env.REACT_APP_API_URL || 'https://vfp-solver-gngfaahkh2fkbbhh.uksouth-01.azurewebsites.net';
+    console.log('Using production URL:', fullProdURL);
+    return fullProdURL;
 };
+
 
 const BASE_URL = getBaseURL();
 

@@ -4,8 +4,12 @@ const getSocketURL = () => {
     if (process.env.NODE_ENV === 'development') {
         return 'http://127.0.0.1:5000';
     }
-    return process.env.REACT_APP_WS_URL || 'vfp-solver-gngfaahkh2fkbbhh.uksouth-01.azurewebsites.net';
+
+    // Fix: Add https:// protocol for Azure deployment
+    const wsURL = process.env.REACT_APP_WS_URL || 'https://vfp-solver-gngfaahkh2fkbbhh.uksouth-01.azurewebsites.net';
+    return fullWSURL;
 };
+
 
 // Create socket connection function
 export const createSocket = (options = {}) => {
