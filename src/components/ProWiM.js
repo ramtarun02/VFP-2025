@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import "./ProWiM.css";
 import Prowim3Dmodel from "./Prowim3Dmodel";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Line } from 'react-chartjs-2';
@@ -15,9 +14,6 @@ import {
 } from 'chart.js';
 
 import { fetchAPI } from '../utils/fetch';
-
-
-
 
 ChartJS.register(
   CategoryScale,
@@ -544,49 +540,72 @@ function PropellerWingForm() {
   // Render polar data panel
   const renderPolarPanel = () => {
     return (
-      <div className={`polar-panel ${isPolarPanelOpen ? 'open' : 'closed'}`}>
-        <div className="polar-panel-header">
-          <h3>Polar Data</h3>
+      <div className={`fixed left-0 top-0 h-screen bg-white border-r border-blue-200 shadow-lg z-50 transition-all duration-300 overflow-y-auto ${isPolarPanelOpen ? 'w-80' : 'w-12'
+        }`}>
+        <div className="flex items-center justify-between p-4 bg-blue-50 border-b border-blue-200 min-h-[60px]">
+          {isPolarPanelOpen && (
+            <h3 className="text-lg font-semibold text-gray-800">Polar Data</h3>
+          )}
           <button
-            className="toggle-polar-btn"
+            className="p-2 hover:bg-blue-100 rounded-lg transition-colors duration-200 text-gray-600"
             onClick={() => setIsPolarPanelOpen(!isPolarPanelOpen)}
           >
-            {isPolarPanelOpen ? '◀' : '▶'}
+            {isPolarPanelOpen ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            )}
           </button>
         </div>
 
         {isPolarPanelOpen && (
-          <div className="polar-panel-content">
+          <div className="p-4">
             {csvFiles.length === 0 ? (
-              <div className="no-polars-message">
-                <p>No Polars found</p>
-                <small>No CSV files detected in the simulation folder</small>
+              <div className="text-center py-8">
+                <div className="text-gray-400 mb-4">
+                  <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-600 font-medium">No Polars found</p>
+                <p className="text-sm text-gray-500 mt-1">No CSV files detected in the simulation folder</p>
               </div>
             ) : (
-              <div className="csv-files-list">
-                <h4>Available CSV Files:</h4>
-                {csvFiles.map((file, index) => (
-                  <div
-                    key={index}
-                    className={`csv-file-item ${selectedCsvFile?.name === file.name ? 'selected' : ''}`}
-                    onClick={() => handleCsvFileSelect(file)}
-                    title={file.name}
-                  >
-                    <span className="file-icon">📊</span>
-                    <span className="file-name">{file.name}</span>
-                    {selectedCsvFile?.name === file.name && (
-                      <span className="selected-indicator">✓</span>
-                    )}
-                  </div>
-                ))}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">Available CSV Files:</h4>
+                <div className="space-y-2">
+                  {csvFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 ${selectedCsvFile?.name === file.name
+                        ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-200'
+                        : 'border-gray-200'
+                        }`}
+                      onClick={() => handleCsvFileSelect(file)}
+                      title={file.name}
+                    >
+                      <span className="text-lg mr-3">📊</span>
+                      <span className="flex-1 text-sm font-medium text-gray-800 truncate">{file.name}</span>
+                      {selectedCsvFile?.name === file.name && (
+                        <span className="text-green-600 font-bold">✓</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
 
                 {polarData && (
-                  <div className="polar-data-info">
-                    <h4>Loaded Polar Data:</h4>
-                    <p>Points: {polarData.alpha.length}</p>
-                    <p>Alpha range: {Math.min(...polarData.alpha).toFixed(1)}° to {Math.max(...polarData.alpha).toFixed(1)}°</p>
-                    <p>CL range: {Math.min(...polarData.cl).toFixed(3)} to {Math.max(...polarData.cl).toFixed(3)}</p>
-                    <p>CD range: {Math.min(...polarData.cd).toFixed(4)} to {Math.max(...polarData.cd).toFixed(4)}</p>
+                  <div className="mt-6 p-4 bg-green-50 rounded-lg border-l-4 border-green-400">
+                    <h4 className="text-sm font-semibold text-green-800 mb-2">Loaded Polar Data:</h4>
+                    <div className="space-y-1 text-xs text-green-700">
+                      <p><span className="font-medium">Points:</span> {polarData.alpha.length}</p>
+                      <p><span className="font-medium">Alpha range:</span> {Math.min(...polarData.alpha).toFixed(1)}° to {Math.max(...polarData.alpha).toFixed(1)}°</p>
+                      <p><span className="font-medium">CL range:</span> {Math.min(...polarData.cl).toFixed(3)} to {Math.max(...polarData.cl).toFixed(3)}</p>
+                      <p><span className="font-medium">CD range:</span> {Math.min(...polarData.cd).toFixed(4)} to {Math.max(...polarData.cd).toFixed(4)}</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -596,175 +615,204 @@ function PropellerWingForm() {
       </div>
     );
   };
+  // ...existing imports and logic code stays the same...
 
   return (
-    <div className="prowim-container">
+    <div className="flex h-screen bg-blue-50 font-sans">
       {/* Polar Data Panel */}
       {renderPolarPanel()}
 
-      {/* Main Content */}
-      <div className={`prowim-main-content ${isPolarPanelOpen ? 'with-panel' : 'full-width'}`}>
-        <div className="model-viewer">
-          {!showPlots ? (
-            <Prowim3Dmodel
-              bOverD={parseFloat(formData.bOverD)}
-              cOverD={parseFloat(formData.cOverD)}
-              D={parseFloat(formData.D)}
-              propLocation={parseFloat(formData.propLocation)}
-            />
-          ) : (
-            <div className="plots-container">
-              <div className="plot-controls">
-                <button type="button" onClick={handleBackToModel} className="btn btn-secondary">
-                  Back to 3D Model
-                </button>
-              </div>
-              {clData && cdData && (
-                <div className="charts">
-                  <div className="chart">
-                    <h4>CL vs Angle of Attack</h4>
-                    <Line data={clData} options={chartOptions} />
-                  </div>
-                  <div className="chart">
-                    <h4>CD vs Angle of Attack</h4>
-                    <Line data={cdData} options={chartOptions} />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      {/* Main Content - Responsive Layout */}
+      <div className={`flex-1 flex flex-col lg:flex-row transition-all duration-300 ${isPolarPanelOpen ? 'ml-80' : 'ml-12'
+        }`}>
 
-        <div className="form-container">
-          <form onSubmit={handleSubmit}>
-            {[
-              { label: "Wing Aspect Ratio (A)", name: "A" },
-              { label: "b / D", name: "bOverD" },
-              { label: "c / D", name: "cOverD" },
-              { label: "Angle of attack at zero lift (α₀) [deg]", name: "alpha0" },
-              { label: "Total number of propellers (N)", name: "N" },
-              { label: "NSPSW", name: "NSPSW" },
-              { label: "ZPD", name: "ZPD" },
-              { label: "IW [deg]", name: "IW" },
-              { label: "Thrust Coefficient (CTIP)", name: "CTIP" },
-              { label: "Propeller Location along Wing Span (y/b)", name: "propLocation" },
-              { label: "Propeller Diameter (D) [m]", name: "D" }
-            ].map(({ label, name }) => (
-              <div key={name}>
-                <label>{label}</label>
+        {/* Form Container - Priority on mobile, flexible on desktop */}
+        <div className="w-full lg:w-96 xl:w-[28rem] 2xl:w-[32rem] bg-white m-2 lg:m-4 rounded-xl shadow-lg overflow-y-auto order-2 lg:order-1 flex-shrink-0">
+          <div className="p-3 lg:p-4 border-b border-gray-200 bg-gray-50">
+            <h2 className="text-lg lg:text-xl font-semibold text-gray-800">ProWiM Configuration</h2>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-4 lg:p-6 space-y-4 lg:space-y-5">
+            {/* Basic Parameters Grid - Responsive */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
+              {[
+                { label: "Wing Aspect Ratio (A)", name: "A", span: false },
+                { label: "b / D", name: "bOverD", span: false },
+                { label: "c / D", name: "cOverD", span: false },
+                { label: "Angle of attack at zero lift (α₀) [deg]", name: "alpha0", span: true },
+                { label: "Total number of propellers (N)", name: "N", span: false },
+                { label: "NSPSW", name: "NSPSW", span: false },
+                { label: "ZPD", name: "ZPD", span: false },
+                { label: "IW [deg]", name: "IW", span: false },
+                { label: "Thrust Coefficient (CTIP)", name: "CTIP", span: true },
+                { label: "Propeller Location along Wing Span (y/b)", name: "propLocation", span: true },
+                { label: "Propeller Diameter (D) [m]", name: "D", span: true }
+              ].map(({ label, name, span }) => (
+                <div key={name} className={span ? "sm:col-span-2" : ""}>
+                  <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">{label}</label>
+                  <input
+                    type="number"
+                    step="any"
+                    name={name}
+                    value={formData[name]}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base transition-colors duration-200"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Array Inputs - Responsive spacing */}
+            <div className="space-y-3 lg:space-y-5 pt-4 lg:pt-5 border-t border-gray-200">
+              <h3 className="text-base lg:text-lg font-semibold text-gray-800">Flight Conditions</h3>
+
+              <div>
+                <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
+                  ALFAWI [deg]
+                  {polarData && <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">📊 Auto-filled</span>}
+                </label>
                 <input
-                  type="number"
-                  step="any"
-                  name={name}
-                  value={formData[name]}
-                  onChange={handleChange}
+                  type="text"
+                  name="ALFAWI"
+                  value={formData.ALFAWI}
+                  onChange={(e) => handleArrayChange("ALFAWI", e.target.value)}
+                  placeholder="0, 5, 10"
                   required
+                  className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base transition-colors duration-200"
+                />
+                <p className="text-xs lg:text-sm text-gray-500 mt-1 lg:mt-2">Current values: [{arrayInputs.ALFAWI.map(val => val.toFixed(2)).join(', ')}]</p>
+              </div>
+
+              <div>
+                <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
+                  CL0
+                  {polarData && <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">📊 Auto-filled</span>}
+                </label>
+                <input
+                  type="text"
+                  name="CL0"
+                  value={formData.CL0}
+                  onChange={(e) => handleArrayChange("CL0", e.target.value)}
+                  placeholder="0.5, 0.6, 0.7"
+                  required
+                  className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base transition-colors duration-200"
+                />
+                <p className="text-xs lg:text-sm text-gray-500 mt-1 lg:mt-2">Current values: [{arrayInputs.CL0.map(val => val.toFixed(3)).join(', ')}]</p>
+              </div>
+
+              <div>
+                <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">
+                  CD0
+                  {polarData && <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">📊 Auto-filled</span>}
+                </label>
+                <input
+                  type="text"
+                  name="CD0"
+                  value={formData.CD0}
+                  onChange={(e) => handleArrayChange("CD0", e.target.value)}
+                  placeholder="0.02, 0.025, 0.03"
+                  required
+                  className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base transition-colors duration-200"
+                />
+                <p className="text-xs lg:text-sm text-gray-500 mt-1 lg:mt-2">Current values: [{arrayInputs.CD0.map(val => val.toFixed(3)).join(', ')}]</p>
+              </div>
+
+              <div>
+                <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">KS00 (Auto-computed)</label>
+                <input
+                  type="text"
+                  value={arrayInputs.KS00.map(val => val.toFixed(5)).join(', ')}
+                  readOnly
+                  className="w-full px-3 lg:px-4 py-2 lg:py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-700 text-sm lg:text-base cursor-not-allowed"
                 />
               </div>
-            ))}
 
-            {/* Array inputs */}
-            <div>
-              <label>ALFAWI [deg] {polarData && <span className="auto-filled-indicator">📊 Auto-filled</span>}</label>
-              <input
-                type="text"
-                name="ALFAWI"
-                value={formData.ALFAWI}
-                onChange={(e) => handleArrayChange("ALFAWI", e.target.value)}
-                placeholder="0, 5, 10"
-                required
-              />
-              <small>Current values: [{arrayInputs.ALFAWI.map(val => val.toFixed(2)).join(', ')}]</small>
+              <div>
+                <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1 lg:mb-2">Number of flap elements (NELMNT)</label>
+                <select
+                  name="NELMNT"
+                  value={formData.NELMNT}
+                  onChange={handleChange}
+                  className="w-full px-3 lg:px-4 py-2 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base transition-colors duration-200"
+                >
+                  <option value="0">Flaps Up</option>
+                  <option value="1">Single Flap</option>
+                  <option value="2">Double Flaps</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label>CL0 {polarData && <span className="auto-filled-indicator">📊 Auto-filled</span>}</label>
-              <input
-                type="text"
-                name="CL0"
-                value={formData.CL0}
-                onChange={(e) => handleArrayChange("CL0", e.target.value)}
-                placeholder="0.5, 0.6, 0.7"
-                required
-              />
-              <small>Current values: [{arrayInputs.CL0.map(val => val.toFixed(3)).join(', ')}]</small>
+            {/* Action Buttons - Responsive */}
+            <div className="space-y-3 lg:space-y-4 pt-4 lg:pt-5 border-t border-gray-200">
+              <button
+                type="submit"
+                className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-base lg:text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Compute ProWiM Analysis
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/post-processing')}
+                className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-base lg:text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+              >
+                Back to Post-Processing
+              </button>
             </div>
-
-            <div>
-              <label>CD0 {polarData && <span className="auto-filled-indicator">📊 Auto-filled</span>}</label>
-              <input
-                type="text"
-                name="CD0"
-                value={formData.CD0}
-                onChange={(e) => handleArrayChange("CD0", e.target.value)}
-                placeholder="0.02, 0.025, 0.03"
-                required
-              />
-              <small>Current values: [{arrayInputs.CD0.map(val => val.toFixed(3)).join(', ')}]</small>
-            </div>
-
-            <div>
-              <label>KS00</label>
-              <input
-                type="text"
-                value={arrayInputs.KS00.join(', ')}
-                readOnly
-                style={{ backgroundColor: '#f5f5f5' }}
-              />
-            </div>
-
-            <label>Number of flap elements (NELMNT)</label>
-            <select name="NELMNT" value={formData.NELMNT} onChange={handleChange}>
-              <option value="0">Flaps Up</option>
-              <option value="1">Single Flap</option>
-              <option value="2">Double Flaps</option>
-            </select>
-
-            <button type="submit">Compute</button>
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/post-processing')}>
-              Back to Post-Processing
-            </button>
           </form>
 
-          {/* Results display */}
+          {/* Results Section - Responsive */}
           {result && Array.isArray(result) && (
-            <div className="results">
-              <h3>Computation Results</h3>
-              <div className="results-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Set</th>
-                      <th>ALFAWI</th>
-                      <th>KS00</th>
-                      <th>CL0</th>
-                      <th>CD0</th>
-                      <th>CL_Prop</th>
-                      <th>CD_Prop</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.map((res, index) => (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{arrayInputs.ALFAWI[index]?.toFixed(2) || 'N/A'}</td>
-                        <td>{arrayInputs.KS00[index]?.toFixed(4) || 'N/A'}</td>
-                        <td>{arrayInputs.CL0[index]?.toFixed(3) || 'N/A'}</td>
-                        <td>{arrayInputs.CD0[index]?.toFixed(4) || 'N/A'}</td>
-                        <td>{res.CZD?.toFixed(5) || 'N/A'}</td>
-                        <td>{res.CXD?.toFixed(5) || 'N/A'}</td>
+            <div className="p-4 lg:p-6 border-t border-gray-200 bg-gray-50">
+              <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-4 lg:mb-5">Computation Results</h3>
+
+              {/* Results Table - Responsive */}
+              <div className="overflow-x-auto mb-4 lg:mb-5">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm min-w-full">
+                  <table className="w-full text-xs lg:text-sm">
+                    <thead className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                      <tr>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">Set</th>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">ALFAWI</th>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">KS00</th>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">CL0</th>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">CD0</th>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">CL_Prop</th>
+                        <th className="px-2 lg:px-4 py-2 lg:py-4 text-center font-semibold">CD_Prop</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {result.map((res, index) => (
+                        <tr key={index} className={`transition-colors duration-200 hover:bg-blue-50 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                          }`}>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center font-medium text-gray-900 bg-gray-100">{index + 1}</td>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center text-gray-700">{arrayInputs.ALFAWI[index]?.toFixed(2) || 'N/A'}</td>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center text-gray-700">{arrayInputs.KS00[index]?.toFixed(4) || 'N/A'}</td>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center text-gray-700">{arrayInputs.CL0[index]?.toFixed(3) || 'N/A'}</td>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center text-gray-700">{arrayInputs.CD0[index]?.toFixed(4) || 'N/A'}</td>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center font-medium text-blue-600">{res.CZD?.toFixed(5) || 'N/A'}</td>
+                          <td className="px-2 lg:px-4 py-2 lg:py-4 text-center font-medium text-red-600">{res.CXD?.toFixed(5) || 'N/A'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="plot-button-container">
-                <button type="button" onClick={handlePlotResults} className="btn btn-success">
-                  Plot CL vs Alpha & CD vs Alpha
+
+              {/* Action Buttons - Responsive */}
+              <div className="flex flex-col gap-3 lg:gap-4">
+                <button
+                  onClick={handlePlotResults}
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-base lg:text-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                  📊 Plot Results
                 </button>
 
-                <select onChange={handleExportDropdown} className="btn btn-info export-dropdown">
-                  <option value="">Export Results</option>
+                <select
+                  onChange={handleExportDropdown}
+                  className="w-full px-4 lg:px-6 py-3 lg:py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 text-base lg:text-lg"
+                >
+                  <option value="">📥 Export Results</option>
                   <option value="csv">Export as CSV</option>
                   <option value="txt">Export as TXT</option>
                 </select>
@@ -772,9 +820,60 @@ function PropellerWingForm() {
             </div>
           )}
         </div>
+
+        {/* 3D Model / Plots Area - Takes remaining space */}
+        <div className="flex-1 bg-white m-2 lg:m-4 rounded-xl shadow-lg overflow-hidden order-1 lg:order-2 min-h-0">
+          {!showPlots ? (
+            <div className="h-full flex flex-col">
+              <div className="p-3 lg:p-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                <h2 className="text-lg lg:text-xl font-semibold text-gray-800">3D Wing-Propeller Model</h2>
+              </div>
+              <div className="flex-1 p-2 lg:p-4 min-h-0">
+                <Prowim3Dmodel
+                  bOverD={parseFloat(formData.bOverD)}
+                  cOverD={parseFloat(formData.cOverD)}
+                  D={parseFloat(formData.D)}
+                  propLocation={parseFloat(formData.propLocation)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col">
+              <div className="p-3 lg:p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between flex-shrink-0">
+                <h2 className="text-lg lg:text-xl font-semibold text-gray-800">Analysis Results</h2>
+                <button
+                  onClick={handleBackToModel}
+                  className="px-3 lg:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm lg:text-base transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                >
+                  <span className="hidden sm:inline">Back to 3D Model</span>
+                  <span className="sm:hidden">Back</span>
+                </button>
+              </div>
+              <div className="flex-1 p-2 lg:p-4 overflow-auto min-h-0">
+                {clData && cdData && (
+                  <div className="space-y-4 lg:space-y-6 h-full">
+                    <div className="bg-white p-3 lg:p-4 rounded-xl border border-gray-200 shadow-sm flex-1 min-h-0">
+                      <h4 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 text-center">CL vs Angle of Attack</h4>
+                      <div className="h-64 lg:h-80 xl:h-96">
+                        <Line data={clData} options={chartOptions} />
+                      </div>
+                    </div>
+                    <div className="bg-white p-3 lg:p-4 rounded-xl border border-gray-200 shadow-sm flex-1 min-h-0">
+                      <h4 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 text-center">CD vs Angle of Attack</h4>
+                      <div className="h-64 lg:h-80 xl:h-96">
+                        <Line data={cdData} options={chartOptions} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
+
 }
 
 export default PropellerWingForm;

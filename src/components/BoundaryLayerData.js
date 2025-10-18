@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Plot from 'react-plotly.js';
-import './BoundaryLayerData.css';
-
 import { fetchAPI } from '../utils/fetch';
 
 function BoundaryLayer() {
@@ -103,7 +101,6 @@ function BoundaryLayer() {
         input.click();
     };
 
-
     // Update the handleSelectVisFromFolder function
     const handleSelectVisFromFolder = async (visFile) => {
         console.log('Selected .vis file from folder:', visFile);
@@ -155,8 +152,6 @@ function BoundaryLayer() {
             setLoading(false);
         }
     };
-
-
 
     // Common function to process .vis files (both local and server)
     const processVisFile = async (file, isLocalFile = true, originalFileName = null) => {
@@ -400,7 +395,7 @@ function BoundaryLayer() {
                 type: 'scatter',
                 mode: 'lines',
                 name: 'Streamwise Velocity',
-                line: { color: '#000000', width: 2 }
+                line: { color: '#1f77b4', width: 2 }
             }],
             layout: {
                 title: {
@@ -439,7 +434,7 @@ function BoundaryLayer() {
                 type: 'scatter',
                 mode: 'lines',
                 name: 'Crossflow Velocity',
-                line: { color: '#000000', width: 2 }
+                line: { color: '#1f77b4', width: 2 }
             }],
             layout: {
                 title: {
@@ -792,44 +787,54 @@ function BoundaryLayer() {
             label: levelKey.charAt(0).toUpperCase() + levelKey.slice(1)
         }));
     };
-
     return (
-        <div className="boundary-layer-container">
+        <div className="flex flex-col h-screen bg-blue-50 font-sans">
             {/* Header */}
-            <div className="boundary-layer-header">
-                <div className="header-left">
-                    <h1>Boundary Layer Data Visualization</h1>
+            <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 bg-white border-b border-blue-200 shadow-sm">
+                <div className="flex items-center">
+                    <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-800">Boundary Layer Data Visualization</h1>
                 </div>
-                <div className="header-right">
-                    <button onClick={handleImportVis} className="header-btn import-btn">
-                        Import .vis File
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                    <button
+                        onClick={handleImportVis}
+                        className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm sm:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    >
+                        <span className="hidden sm:inline">Import .vis File</span>
+                        <span className="sm:hidden">Import</span>
                     </button>
-                    <button onClick={() => navigate('/post-processing')} className="header-btn back-btn">
-                        Back to Post-Processing
+                    <button
+                        onClick={() => navigate('/post-processing')}
+                        className="px-3 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm sm:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+                    >
+                        <span className="hidden sm:inline">Back to Post-Processing</span>
+                        <span className="sm:hidden">Back</span>
                     </button>
                 </div>
             </div>
 
             {/* Content */}
-            <div className="boundary-layer-content">
+            <div className="flex flex-1 overflow-hidden">
                 {/* Controls Sidebar */}
-                <div className="controls-sidebar">
+                <div className="w-64 lg:w-80 bg-white border-r border-blue-200 p-3 lg:p-4 overflow-y-auto flex-shrink-0">
                     {/* Available .vis Files Section */}
                     {availableVisFiles.length > 0 && (
-                        <div className="control-section">
-                            <h3>Available .vis Files</h3>
-                            <div className="vis-files-list">
+                        <div className="mb-4 lg:mb-6">
+                            <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                Available .vis Files
+                            </h3>
+                            <div className="flex flex-col gap-2 max-h-32 lg:max-h-48 overflow-y-auto border border-blue-200 rounded-lg p-2 bg-blue-50">
                                 {availableVisFiles.map((visFile, index) => (
                                     <div
                                         key={index}
-                                        className="vis-file-item"
+                                        className={`flex items-center p-2 lg:p-3 bg-white border border-blue-200 rounded-lg cursor-pointer transition-all duration-200 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm ${visData && visData.fileName === visFile.name ? 'ring-2 ring-blue-500 border-blue-500' : ''
+                                            }`}
                                         onClick={() => handleSelectVisFromFolder(visFile)}
                                         title={`Click to load ${visFile.name}`}
                                     >
-                                        <span className="vis-file-icon">📊</span>
-                                        <span className="vis-file-name">{visFile.name}</span>
+                                        <span className="text-sm lg:text-lg mr-2 lg:mr-3">📊</span>
+                                        <span className="flex-1 text-xs lg:text-sm font-medium text-gray-800 truncate">{visFile.name}</span>
                                         {visData && visData.fileName === visFile.name && (
-                                            <span className="vis-file-selected">✓</span>
+                                            <span className="text-blue-600 font-bold text-sm">✓</span>
                                         )}
                                     </div>
                                 ))}
@@ -837,55 +842,66 @@ function BoundaryLayer() {
                         </div>
                     )}
 
-                    <div className="control-section">
-                        <h3>File Information</h3>
+                    <div className="mb-4 lg:mb-6">
+                        <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                            File Information
+                        </h3>
                         {visData ? (
-                            <div className="file-info">
-                                <p><strong>File:</strong> {visData.fileName}</p>
-                                <p><strong>Levels Available:</strong> {Object.keys(visData.levels || {}).length}</p>
+                            <div className="bg-blue-50 p-3 lg:p-4 rounded-lg border-l-4 border-blue-400">
+                                <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">File:</span> <span className="text-gray-900">{visData.fileName}</span></p>
+                                <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Levels Available:</span> <span className="text-gray-900">{Object.keys(visData.levels || {}).length}</span></p>
                                 {visData.levels[selectedLevel] && (
                                     <>
-                                        <p><strong>Mach Number:</strong> {visData.levels[selectedLevel].machNumber}</p>
-                                        <p><strong>Reynolds Number:</strong> {visData.levels[selectedLevel].reynoldsNumber}</p>
-                                        <p><strong>Angle of Attack:</strong> {visData.levels[selectedLevel].incidence}°</p>
+                                        <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Mach Number:</span> <span className="text-gray-900">{visData.levels[selectedLevel].machNumber}</span></p>
+                                        <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Reynolds Number:</span> <span className="text-gray-900">{visData.levels[selectedLevel].reynoldsNumber}</span></p>
+                                        <p className="text-sm"><span className="font-semibold text-gray-700">Angle of Attack:</span> <span className="text-gray-900">{visData.levels[selectedLevel].incidence}°</span></p>
                                     </>
                                 )}
                             </div>
                         ) : (
-                            <div className="no-file">
-                                <p>No .vis file loaded</p>
+                            <div className="text-gray-600">
+                                <p className="mb-2 text-sm">No .vis file loaded</p>
                                 {availableVisFiles.length > 0 ? (
-                                    <p className="hint">Select a .vis file from above or import a new one</p>
+                                    <p className="text-xs italic text-gray-500">Select a .vis file from above or import a new one</p>
                                 ) : (
-                                    <p className="hint">Import a .vis file to get started</p>
+                                    <p className="text-xs italic text-gray-500">Import a .vis file to get started</p>
                                 )}
                             </div>
                         )}
                     </div>
 
                     {/* BL Velocity Profile Toggle */}
-                    <div className="control-section">
-                        <h3>View Mode</h3>
-                        <div className="toggle-container">
-                            <label className="toggle-label">
-                                <input
-                                    type="checkbox"
-                                    checked={showBLProfile}
-                                    onChange={(e) => setShowBLProfile(e.target.checked)}
-                                    className="toggle-checkbox"
-                                />
-                                <span className="toggle-slider"></span>
-                                <span className="toggle-text">BL Velocity Profile</span>
+                    <div className="mb-4 lg:mb-6">
+                        <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                            View Mode
+                        </h3>
+                        <div className="flex items-center">
+                            <label className="flex items-center cursor-pointer">
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        checked={showBLProfile}
+                                        onChange={(e) => setShowBLProfile(e.target.checked)}
+                                        className="sr-only"
+                                    />
+                                    <div className={`w-10 lg:w-12 h-5 lg:h-6 rounded-full transition-colors duration-200 ${showBLProfile ? 'bg-blue-500' : 'bg-gray-300'
+                                        }`}></div>
+                                    <div className={`absolute top-0.5 left-0.5 w-4 lg:w-5 h-4 lg:h-5 bg-white rounded-full transition-transform duration-200 ${showBLProfile ? 'transform translate-x-5 lg:translate-x-6' : ''
+                                        }`}></div>
+                                </div>
+                                <span className="ml-2 lg:ml-3 font-medium text-gray-800 text-sm lg:text-base">BL Velocity Profile</span>
                             </label>
                         </div>
                     </div>
 
                     {visData && !showBLProfile && (
                         <>
-                            <div className="control-section">
-                                <h3>Level Selection</h3>
+                            <div className="mb-4 lg:mb-6">
+                                <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                    Level Selection
+                                </h3>
                                 <select
-                                    className="control-dropdown"
+                                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm lg:text-base transition-colors duration-200"
                                     value={selectedLevel}
                                     onChange={(e) => setSelectedLevel(e.target.value)}
                                 >
@@ -897,10 +913,12 @@ function BoundaryLayer() {
                                 </select>
                             </div>
 
-                            <div className="control-section">
-                                <h3>Section Selection</h3>
+                            <div className="mb-4 lg:mb-6">
+                                <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                    Section Selection
+                                </h3>
                                 <select
-                                    className="control-dropdown"
+                                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm lg:text-base transition-colors duration-200"
                                     value={selectedSection}
                                     onChange={(e) => setSelectedSection(e.target.value)}
                                 >
@@ -914,12 +932,14 @@ function BoundaryLayer() {
                             </div>
 
                             {selectedSection && visData.levels[selectedLevel]?.sections[selectedSection] && (
-                                <div className="control-section">
-                                    <h3>Section Details</h3>
-                                    <div className="section-details">
-                                        <p><strong>Span:</strong> j-2 = {visData.levels[selectedLevel].sections[selectedSection].spanJ2}</p>
-                                        <p><strong>Eta:</strong> {visData.levels[selectedLevel].sections[selectedSection].eta?.toFixed(5)}</p>
-                                        <p><strong>Chord:</strong> {visData.levels[selectedLevel].sections[selectedSection].chord?.toFixed(5)}</p>
+                                <div className="mb-4 lg:mb-6">
+                                    <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                        Section Details
+                                    </h3>
+                                    <div className="bg-green-50 p-3 lg:p-4 rounded-lg border-l-4 border-green-400">
+                                        <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Span:</span> <span className="text-gray-900">j-2 = {visData.levels[selectedLevel].sections[selectedSection].spanJ2}</span></p>
+                                        <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Eta:</span> <span className="text-gray-900">{visData.levels[selectedLevel].sections[selectedSection].eta?.toFixed(5)}</span></p>
+                                        <p className="text-sm"><span className="font-semibold text-gray-700">Chord:</span> <span className="text-gray-900">{visData.levels[selectedLevel].sections[selectedSection].chord?.toFixed(5)}</span></p>
                                     </div>
                                 </div>
                             )}
@@ -929,11 +949,13 @@ function BoundaryLayer() {
                     {/* BL Velocity Profile Controls */}
                     {visData && showBLProfile && (
                         <>
-                            <div className="control-section">
-                                <h3>Input Parameters</h3>
-                                <div className="bl-inputs">
-                                    <div className="input-group">
-                                        <label>X/C:</label>
+                            <div className="mb-4 lg:mb-6">
+                                <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                    Input Parameters
+                                </h3>
+                                <div className="space-y-3 lg:space-y-4 mb-3 lg:mb-4">
+                                    <div className="flex items-center space-x-3">
+                                        <label className="font-semibold text-gray-700 w-10 lg:w-12 text-sm lg:text-base">X/C:</label>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -944,11 +966,11 @@ function BoundaryLayer() {
                                                 ...prev,
                                                 xc: parseFloat(e.target.value)
                                             }))}
-                                            className="bl-input"
+                                            className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base"
                                         />
                                     </div>
-                                    <div className="input-group">
-                                        <label>η:</label>
+                                    <div className="flex items-center space-x-3">
+                                        <label className="font-semibold text-gray-700 w-10 lg:w-12 text-sm lg:text-base">η:</label>
                                         <input
                                             type="number"
                                             step="0.1"
@@ -957,66 +979,72 @@ function BoundaryLayer() {
                                                 ...prev,
                                                 eta: parseFloat(e.target.value)
                                             }))}
-                                            className="bl-input"
+                                            className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 text-sm lg:text-base"
                                         />
                                     </div>
                                 </div>
                                 <button
                                     onClick={calculateBLProfile}
-                                    className="calculate-btn"
+                                    className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm lg:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                                 >
                                     Calculate
                                 </button>
                             </div>
 
-                            <div className="control-section">
-                                <h3>Surface Selection</h3>
-                                <div className="surface-selection">
-                                    <label className="radio-label">
+                            <div className="mb-4 lg:mb-6">
+                                <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                    Surface Selection
+                                </h3>
+                                <div className="space-y-2">
+                                    <label className="flex items-center p-2 lg:p-3 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors duration-200">
                                         <input
                                             type="radio"
                                             name="surface"
                                             value="upper"
                                             checked={selectedSurface === 'upper'}
                                             onChange={(e) => setSelectedSurface(e.target.value)}
+                                            className="mr-2 lg:mr-3 text-blue-600 focus:ring-blue-500"
                                         />
-                                        <span>Upper Surface</span>
+                                        <span className={`font-medium text-sm lg:text-base ${selectedSurface === 'upper' ? 'text-blue-600' : 'text-gray-700'}`}>Upper Surface</span>
                                     </label>
-                                    <label className="radio-label">
+                                    <label className="flex items-center p-2 lg:p-3 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors duration-200">
                                         <input
                                             type="radio"
                                             name="surface"
                                             value="lower"
                                             checked={selectedSurface === 'lower'}
                                             onChange={(e) => setSelectedSurface(e.target.value)}
+                                            className="mr-2 lg:mr-3 text-blue-600 focus:ring-blue-500"
                                         />
-                                        <span>Lower Surface</span>
+                                        <span className={`font-medium text-sm lg:text-base ${selectedSurface === 'lower' ? 'text-blue-600' : 'text-gray-700'}`}>Lower Surface</span>
                                     </label>
                                 </div>
                             </div>
 
-                            <div className="control-section">
-                                <h3>Parameters</h3>
-                                <div className="parameters-display">
-                                    <div className="param-item">
-                                        <span className="param-label">θ</span>
-                                        <span className="param-value">{blParameters.theta}</span>
+                            <div className="mb-4 lg:mb-6">
+                                <h3 className="text-base lg:text-lg font-semibold text-gray-800 mb-2 lg:mb-3 pb-2 border-b-2 border-blue-400">
+                                    Parameters
+                                </h3>
+                                <div className="bg-gray-800 rounded-lg p-3 lg:p-4 text-white">
+                                    <div className="flex justify-between items-center py-2 border-b border-gray-600">
+                                        <span className="font-semibold text-gray-200 text-sm lg:text-base">θ</span>
+                                        <span className="font-mono bg-gray-700 px-2 py-1 rounded text-xs lg:text-sm text-gray-200">{blParameters.theta}</span>
                                     </div>
-                                    <div className="param-item">
-                                        <span className="param-label">δ*</span>
-                                        <span className="param-value">{blParameters.delta}</span>
+                                    <div className="flex justify-between items-center py-2 border-b border-gray-600">
+                                        <span className="font-semibold text-gray-200 text-sm lg:text-base">δ*</span>
+                                        <span className="font-mono bg-gray-700 px-2 py-1 rounded text-xs lg:text-sm text-gray-200">{blParameters.delta}</span>
                                     </div>
-                                    <div className="param-item">
-                                        <span className="param-label">H bar</span>
-                                        <span className="param-value">{blParameters.hbar}</span>
+                                    <div className="flex justify-between items-center py-2 border-b border-gray-600">
+                                        <span className="font-semibold text-gray-200 text-sm lg:text-base">H bar</span>
+                                        <span className="font-mono bg-gray-700 px-2 py-1 rounded text-xs lg:text-sm text-gray-200">{blParameters.hbar}</span>
                                     </div>
-                                    <div className="param-item">
-                                        <span className="param-label">Cf</span>
-                                        <span className="param-value">{blParameters.cf}</span>
+                                    <div className="flex justify-between items-center py-2 border-b border-gray-600">
+                                        <span className="font-semibold text-gray-200 text-sm lg:text-base">Cf</span>
+                                        <span className="font-mono bg-gray-700 px-2 py-1 rounded text-xs lg:text-sm text-gray-200">{blParameters.cf}</span>
                                     </div>
-                                    <div className="param-item">
-                                        <span className="param-label">β</span>
-                                        <span className="param-value">{blParameters.beta}</span>
+                                    <div className="flex justify-between items-center py-2">
+                                        <span className="font-semibold text-gray-200 text-sm lg:text-base">β</span>
+                                        <span className="font-mono bg-gray-700 px-2 py-1 rounded text-xs lg:text-sm text-gray-200">{blParameters.beta}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1025,33 +1053,54 @@ function BoundaryLayer() {
                 </div>
 
                 {/* Plot Area */}
-                <div className="plot-area">
+                <div className="flex-1 flex flex-col p-2 lg:p-4 bg-white overflow-hidden">
                     {loading && (
-                        <div className="loading-indicator">
-                            <p>Loading VIS file...</p>
+                        <div className="flex-1 flex justify-center items-center">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-10 lg:h-12 w-10 lg:w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                <p className="text-lg lg:text-xl text-blue-600 font-medium">Loading VIS file...</p>
+                            </div>
                         </div>
                     )}
 
                     {error && (
-                        <div className="error-message">
-                            <p>{error}</p>
+                        <div className="flex-1 flex justify-center items-center">
+                            <div className="text-center">
+                                <div className="text-red-500 mb-4">
+                                    <svg className="w-12 lg:w-16 h-12 lg:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <p className="text-red-600 text-base lg:text-lg font-medium">{error}</p>
+                            </div>
                         </div>
                     )}
 
                     {!visData && !loading && !error && (
-                        <div className="empty-state">
-                            <h2>Welcome to Boundary Layer Data Visualization</h2>
+                        <div className="flex-1 flex flex-col justify-center items-center text-center">
+                            <div className="text-blue-400 mb-4 lg:mb-6">
+                                <svg className="w-16 lg:w-24 h-16 lg:h-24 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl lg:text-3xl font-semibold text-gray-800 mb-3 lg:mb-4">Welcome to Boundary Layer Data Visualization</h2>
                             {availableVisFiles.length > 0 ? (
                                 <div>
-                                    <p>Select a .vis file from the available files above, or import a new one</p>
-                                    <button onClick={handleImportVis} className="import-button-large">
+                                    <p className="text-gray-600 text-sm lg:text-lg mb-4 lg:mb-6">Select a .vis file from the available files above, or import a new one</p>
+                                    <button
+                                        onClick={handleImportVis}
+                                        className="px-6 lg:px-8 py-3 lg:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base lg:text-lg transition-all duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    >
                                         Import New .vis File
                                     </button>
                                 </div>
                             ) : (
                                 <div>
-                                    <p>Import a .vis file to get started</p>
-                                    <button onClick={handleImportVis} className="import-button-large">
+                                    <p className="text-gray-600 text-sm lg:text-lg mb-4 lg:mb-6">Import a .vis file to get started</p>
+                                    <button
+                                        onClick={handleImportVis}
+                                        className="px-6 lg:px-8 py-3 lg:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-base lg:text-lg transition-all duration-200 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    >
                                         Import .vis File
                                     </button>
                                 </div>
@@ -1059,107 +1108,75 @@ function BoundaryLayer() {
                         </div>
                     )}
 
-                    {/* Default 6-plot view */}
+                    {/* Default 6-plot view - Responsive Grid */}
                     {visData && !showBLProfile && plotData.theta && (
-                        <div className="plots-grid">
-                            <div className="plot-item">
-                                <Plot
-                                    data={plotData.theta.data}
-                                    layout={plotData.theta.layout}
-                                    config={plotData.theta.config}
-                                    style={{ width: '100%', height: '100%' }}
-                                    useResizeHandler={true}
-                                />
-                            </div>
-
-                            <div className="plot-item">
-                                <Plot
-                                    data={plotData.delta.data}
-                                    layout={plotData.delta.layout}
-                                    config={plotData.delta.config}
-                                    style={{ width: '100%', height: '100%' }}
-                                    useResizeHandler={true}
-                                />
-                            </div>
-
-                            <div className="plot-item">
-                                <Plot
-                                    data={plotData.hbar.data}
-                                    layout={plotData.hbar.layout}
-                                    config={plotData.hbar.config}
-                                    style={{ width: '100%', height: '100%' }}
-                                    useResizeHandler={true}
-                                />
-                            </div>
-
-                            <div className="plot-item">
-                                <Plot
-                                    data={plotData.cf.data}
-                                    layout={plotData.cf.layout}
-                                    config={plotData.cf.config}
-                                    style={{ width: '100%', height: '100%' }}
-                                    useResizeHandler={true}
-                                />
-                            </div>
-
-                            <div className="plot-item">
-                                <Plot
-                                    data={plotData.beta.data}
-                                    layout={plotData.beta.layout}
-                                    config={plotData.beta.config}
-                                    style={{ width: '100%', height: '100%' }}
-                                    useResizeHandler={true}
-                                />
-                            </div>
-
-                            <div className="plot-item">
-                                <Plot
-                                    data={plotData.cp.data}
-                                    layout={plotData.cp.layout}
-                                    config={plotData.cp.config}
-                                    style={{ width: '100%', height: '100%' }}
-                                    useResizeHandler={true}
-                                />
+                        <div className="flex-1 overflow-auto">
+                            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-3 lg:gap-4 p-2 lg:p-4 min-h-full">
+                                {Object.entries(plotData).map(([key, data]) => (
+                                    data && (
+                                        <div key={key} className="w-full h-96 lg:h-[500px] xl:h-96 2xl:h-[400px] border border-blue-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200 flex-shrink-0">
+                                            <Plot
+                                                data={data.data}
+                                                layout={data.layout}
+                                                config={data.config}
+                                                style={{ width: '100%', height: '100%' }}
+                                                useResizeHandler={true}
+                                            />
+                                        </div>
+                                    )
+                                ))}
                             </div>
                         </div>
                     )}
 
-                    {/* BL Velocity Profile view */}
+                    {/* BL Velocity Profile view - Responsive */}
                     {visData && showBLProfile && (
-                        <div className="bl-profile-container">
-                            <div className="bl-profile-title">
-                                <h2>Boundary Layer Velocity Profile</h2>
+                        <div className="flex flex-col h-full overflow-auto">
+                            <div className="text-center mb-4 lg:mb-6 px-4">
+                                <h2 className="text-xl lg:text-3xl font-semibold text-blue-600">Boundary Layer Velocity Profile</h2>
                             </div>
-                            <div className="bl-plots-grid">
-                                <div className="bl-plot-item">
-                                    {blPlots.streamwise ? (
-                                        <Plot
-                                            data={blPlots.streamwise.data}
-                                            layout={blPlots.streamwise.layout}
-                                            config={blPlots.streamwise.config}
-                                            style={{ width: '100%', height: '100%' }}
-                                            useResizeHandler={true}
-                                        />
-                                    ) : (
-                                        <div className="empty-plot">
-                                            <p>Click Calculate to generate streamwise velocity profile</p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="bl-plot-item">
-                                    {blPlots.crossflow ? (
-                                        <Plot
-                                            data={blPlots.crossflow.data}
-                                            layout={blPlots.crossflow.layout}
-                                            config={blPlots.crossflow.config}
-                                            style={{ width: '100%', height: '100%' }}
-                                            useResizeHandler={true}
-                                        />
-                                    ) : (
-                                        <div className="empty-plot">
-                                            <p>Click Calculate to generate crossflow velocity profile</p>
-                                        </div>
-                                    )}
+                            <div className="flex-1 px-2 lg:px-4 pb-4">
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 h-full">
+                                    <div className="h-96 lg:h-[500px] xl:h-full border border-blue-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-center flex-shrink-0">
+                                        {blPlots.streamwise ? (
+                                            <Plot
+                                                data={blPlots.streamwise.data}
+                                                layout={blPlots.streamwise.layout}
+                                                config={blPlots.streamwise.config}
+                                                style={{ width: '100%', height: '100%' }}
+                                                useResizeHandler={true}
+                                            />
+                                        ) : (
+                                            <div className="text-center p-6 lg:p-8">
+                                                <div className="text-blue-400 mb-4">
+                                                    <svg className="w-12 lg:w-16 h-12 lg:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                </div>
+                                                <p className="text-gray-600 italic text-sm lg:text-base">Click Calculate to generate streamwise velocity profile</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="h-96 lg:h-[500px] xl:h-full border border-blue-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-center flex-shrink-0">
+                                        {blPlots.crossflow ? (
+                                            <Plot
+                                                data={blPlots.crossflow.data}
+                                                layout={blPlots.crossflow.layout}
+                                                config={blPlots.crossflow.config}
+                                                style={{ width: '100%', height: '100%' }}
+                                                useResizeHandler={true}
+                                            />
+                                        ) : (
+                                            <div className="text-center p-6 lg:p-8">
+                                                <div className="text-blue-400 mb-4">
+                                                    <svg className="w-12 lg:w-16 h-12 lg:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                </div>
+                                                <p className="text-gray-600 italic text-sm lg:text-base">Click Calculate to generate crossflow velocity profile</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1168,6 +1185,7 @@ function BoundaryLayer() {
             </div>
         </div>
     );
+
 }
 
 export default BoundaryLayer;

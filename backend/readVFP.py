@@ -968,10 +968,10 @@ def saveConsolidatedJSON(consolidated_data, output_filename):
 
 
 # Test functions (optional)
-# if __name__ == "__main__":
+if __name__ == "__main__":
     # Test the functions with sample files if available
     # test_and_print_json(readFLOW, 'M033Re12p0ma+0p00.dat')
-    # test_and_print_json(readCP, 'CRM1wbsM085Re5ma0p0.cp')
+    test_and_print_json(readCP, 'CRM1wbsM085Re5ma0p0.cp')
     # test_and_print_json(readVIS, 'CRM1wbsM085Re5ma0p0.vis')
     # test_and_print_json(readMAP, 'CRM1wb.map')
  

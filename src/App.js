@@ -9,6 +9,8 @@ import ProWiM from "./components/ProWiM"
 import { FormDataProvider } from "./components/FormDataContext";
 import SimulationRun from "./components/SimulationRun";
 import BoundaryLayer from "./components/BoundaryLayerData";
+import ContourPlot from "./components/ContourPlot";
+
 
 
 function App() {
@@ -22,6 +24,7 @@ function App() {
           <Route path="/results" element={<Solver />} />
           <Route path="/post-processing" element={<PostProcessing />} />
           <Route path="/post-processing/prowim" element={<ProWiM />} />
+          <Route path="/post-processing/contour-plot" element={<ContourPlot />} />
           <Route path="/post-processing/boundary-layer" element={<BoundaryLayer />} />
           <Route path="/simulation-run" element={<SimulationRun />} />
         </Routes>

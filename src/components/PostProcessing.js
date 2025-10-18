@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Plot from 'react-plotly.js';
-import "./PostProcessing.css";
-import { common } from "@material-ui/core/colors";
 import { fetchAPI } from '../utils/fetch';
 
 function PostProcessing() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isExplorerOpen, setIsExplorerOpen] = useState(true);
-  const [explorerWidth, setExplorerWidth] = useState(300);
+  const [explorerWidth, setExplorerWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
   const [simulationData, setSimulationData] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState({
@@ -17,8 +15,9 @@ function PostProcessing() {
     cp: null,
     forces: null
   });
+
+  // Server response data states
   const [parsedForcesData, setParsedForcesData] = useState(null);
-  const [parsedDatData, setParsedDatData] = useState(null);
   const [parsedCpData, setParsedCpData] = useState(null);
   const [levels, setLevels] = useState([]);
   const [sections, setSections] = useState([]);
@@ -33,6 +32,11 @@ function PostProcessing() {
   const [showSpanwiseDistribution, setShowSpanwiseDistribution] = useState(false);
   const [selectedSpanwiseCoeff, setSelectedSpanwiseCoeff] = useState('CL');
   const [spanwiseData, setSpanwiseData] = useState(null);
+
+  // Loading states
+  const [isLoadingCP, setIsLoadingCP] = useState(false);
+  const [isLoadingForces, setIsLoadingForces] = useState(false);
+  const [isLoadingDAT, setIsLoadingDAT] = useState(false);
 
   // Coefficients data
   const [coefficients, setCoefficients] = useState({
@@ -103,52 +107,6 @@ function PostProcessing() {
     return fileTypes;
   };
 
-  // Fetch file content from server
-  const fetchServerFile = async (file) => {
-    try {
-      console.log('Fetching server file:', file);
-
-      const simName = simulationData?.simName || 'unknown';
-      console.log('Using simulation name:', simName);
-      console.log('File path:', file.path);
-
-      const response = await fetchAPI(`/get_file_content`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          simName: simName,
-          filePath: file.path || file.name
-        })
-      });
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-
-      const content = await response.text();
-      console.log('File content fetched successfully, length:', content.length);
-      return content;
-
-    } catch (error) {
-      console.error('Error fetching file content:', error);
-
-      if (error.message.includes('Failed to fetch')) {
-        alert(`Network error loading file ${file.name}. Please check if the backend server is running on http://127.0.0.1:5000`);
-      } else if (error.message.includes('404')) {
-        alert(`File ${file.name} not found on server.`);
-      } else {
-        alert(`Error loading file ${file.name}: ${error.message}`);
-      }
-      return null;
-    }
-  };
-
   // Process simulation data on component mount
   useEffect(() => {
     console.log('Location state received:', location.state);
@@ -185,17 +143,46 @@ function PostProcessing() {
   // Update sections when level or CP data changes
   useEffect(() => {
     if (parsedCpData && selectedLevel) {
-      const levelIndex = parseInt(selectedLevel) - 1;
-      if (levelIndex >= 0 && levelIndex < parsedCpData.levels.length) {
-        const level = parsedCpData.levels[levelIndex];
-        const sectionOptions = level.sections.map((section, index) => ({
-          value: index + 1,
-          label: `Section ${index + 1}`,
-          data: section
-        }));
-        setSections(sectionOptions);
-        setSelectedSection('');
+      console.log('Updating sections for level:', selectedLevel);
+      console.log('Available levels in CP data:', Object.keys(parsedCpData.levels || {}));
+
+      if (parsedCpData.levels && parsedCpData.levels[selectedLevel]) {
+        const level = parsedCpData.levels[selectedLevel];
+        console.log('Selected level data:', level);
+
+        if (level.sections && Object.keys(level.sections).length > 0) {
+          const sectionOptions = Object.entries(level.sections).map(([sectionKey, sectionData]) => {
+            // Extract section number from sectionKey (e.g., "section1" -> 1)
+            const sectionMatch = sectionKey.match(/section(\d+)/);
+            const sectionNumber = sectionMatch ? parseInt(sectionMatch[1]) : 1;
+
+            // Also try to get section number from sectionHeader if available
+            let actualSectionNumber = sectionNumber;
+            if (sectionData.sectionHeader) {
+              const headerSectionMatch = sectionData.sectionHeader.match(/J=\s*(\d+)/);
+              if (headerSectionMatch) {
+                actualSectionNumber = parseInt(headerSectionMatch[1]);
+              }
+            }
+
+            return {
+              value: sectionKey, // Use the actual key like "section1"
+              label: `Section ${actualSectionNumber}`,
+              actualSectionNumber: actualSectionNumber,
+              data: sectionData
+            };
+          });
+
+          console.log('Section options created:', sectionOptions);
+          setSections(sectionOptions);
+          setSelectedSection('');
+        } else {
+          console.log('No sections found in level data');
+          setSections([]);
+          setSelectedSection('');
+        }
       } else {
+        console.log('Selected level not found in CP data');
         setSections([]);
         setSelectedSection('');
       }
@@ -206,11 +193,103 @@ function PostProcessing() {
   }, [parsedCpData, selectedLevel]);
 
   // Generate plots when selections change
-  useEffect(() => {
+  const generatePlotData = useCallback(() => {
     if (selectedLevel && selectedPlotType && selectedSection && parsedCpData && !showMesh) {
-      generatePlotData();
+      generatePlot1Data();
+      generatePlot2Data();
     }
   }, [selectedLevel, selectedPlotType, selectedSection, parsedCpData, showMesh]);
+
+  useEffect(() => {
+    generatePlotData();
+  }, [generatePlotData]);
+
+  // Generate spanwise plots when selections change
+  const generateSpanwisePlotData = useCallback(() => {
+    if (selectedLevel && selectedSpanwiseCoeff && parsedCpData && showSpanwiseDistribution) {
+      console.log('generateSpanwisePlotData called');
+
+      if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
+        console.log('Level not found for spanwise:', selectedLevel);
+        return;
+      }
+
+      const level = parsedCpData.levels[selectedLevel];
+      const sections = level.sections;
+
+      if (!sections || Object.keys(sections).length === 0) {
+        console.log('No sections found for spanwise');
+        return;
+      }
+
+      // Extract YAVE and coefficient values from section coefficients
+      const yaveValues = [];
+      const coeffValues = [];
+
+      Object.values(sections).forEach((section) => {
+        if (section.coefficients) {
+          const yave = section.coefficients.YAVE;
+          const coeff = section.coefficients[selectedSpanwiseCoeff];
+
+          if (yave !== undefined && coeff !== undefined) {
+            yaveValues.push(yave);
+            coeffValues.push(coeff);
+          }
+        }
+      });
+
+      if (yaveValues.length === 0 || coeffValues.length === 0) {
+        console.log('No valid spanwise data found');
+        return;
+      }
+
+      const plotColor = '#334155'; // Professional slate color
+
+      const spanwisePlotData = [{
+        x: yaveValues,
+        y: coeffValues,
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: plotColor, width: 2 },
+        marker: { color: plotColor, size: 6 },
+        name: `${selectedSpanwiseCoeff} vs YAVE`
+      }];
+
+      const spanwisePlotLayout = {
+        title: `Spanwise Distribution - ${selectedSpanwiseCoeff} vs YAVE (Level ${selectedLevel})`,
+        xaxis: {
+          title: 'YAVE',
+          showgrid: true,
+          zeroline: true,
+          showticklabels: true
+        },
+        yaxis: {
+          title: selectedSpanwiseCoeff,
+          showgrid: true,
+          zeroline: true,
+          showticklabels: true
+        },
+        margin: { l: 60, r: 40, t: 60, b: 60 },
+        showlegend: false,
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+      };
+
+      setSpanwiseData({
+        data: spanwisePlotData,
+        layout: spanwisePlotLayout,
+        config: {
+          displayModeBar: true,
+          displaylogo: false,
+          modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+        }
+      });
+    }
+  }, [selectedLevel, selectedSpanwiseCoeff, parsedCpData, showSpanwiseDistribution]);
+
+  useEffect(() => {
+    generateSpanwisePlotData();
+  }, [generateSpanwisePlotData]);
 
   // Resize handlers
   const handleMouseDown = useCallback((e) => {
@@ -251,6 +330,82 @@ function PostProcessing() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
+  // Server file parsing functions
+  const sendFileToServer = async (file, fileType) => {
+    try {
+      const simName = simulationData?.simName || 'unknown';
+      console.log(`Sending ${fileType} file to server:`, file.name);
+
+      let fileContent;
+
+      // Get file content
+      if (file.file) {
+        // From folder import
+        fileContent = await readFileContent(file.file);
+      } else {
+        // From server
+        const response = await fetchAPI(`/get_file_content`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            simName: simName,
+            filePath: file.path || file.name
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        fileContent = await response.text();
+      }
+
+      // Send to parser endpoint
+      const parseResponse = await fetchAPI(`/parse_${fileType}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          content: fileContent,
+          simName: simName
+        })
+      });
+
+      if (!parseResponse.ok) {
+        const errorText = await parseResponse.text();
+        throw new Error(`Parse error! status: ${parseResponse.status}, message: ${errorText}`);
+      }
+
+      const parsedData = await parseResponse.json();
+      console.log(`Parsed ${fileType} data received:`, parsedData);
+
+      return parsedData;
+
+    } catch (error) {
+      console.error(`Error processing ${fileType} file:`, error);
+
+      if (error.message.includes('Failed to fetch')) {
+        alert(`Network error processing ${fileType} file. Please check if the backend server is running.`);
+      } else {
+        alert(`Error processing ${fileType} file: ${error.message}`);
+      }
+      return null;
+    }
+  };
+
+  const readFileContent = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = (e) => reject(e);
+      reader.readAsText(file);
+    });
+  };
+
   // Import folder handler
   const handleImportFolder = () => {
     const input = document.createElement('input');
@@ -274,6 +429,22 @@ function PostProcessing() {
     navigate('/post-processing/prowim', {
       state: {
         simulationFolder: simulationData
+      }
+    });
+  };
+
+  const handleContourPlotClick = () => {
+    if (!parsedCpData || !selectedLevel) {
+      alert('Please select CP file and choose a level first.');
+      return;
+    }
+
+    navigate('/post-processing/contour-plot', {
+      state: {
+        simulationFolder: simulationData,
+        simName: simulationData?.simName,
+        parsedCpData: parsedCpData,
+        selectedLevel: selectedLevel
       }
     });
   };
@@ -327,7 +498,7 @@ function PostProcessing() {
   };
 
   // File selection handler
-  const handleFileSelect = (file) => {
+  const handleFileSelect = async (file) => {
     console.log('File selected:', file);
 
     const ext = file.name.split('.').pop().toLowerCase();
@@ -339,94 +510,99 @@ function PostProcessing() {
         [ext]: file
       }));
 
-      if (ext === 'dat') {
-        setParsedDatData(null);
-        setSelectedLevel('');
-
-        if (file.file) {
-          console.log('Processing DAT file from folder import');
-          parseDatFile(file.file);
-        } else {
-          console.log('Processing DAT file from server');
-          fetchServerFile(file).then(content => {
-            if (content) {
-              try {
-                const blob = new Blob([content], { type: 'text/plain' });
-                const fileObj = new File([blob], file.name, { type: 'text/plain' });
-                parseDatFile(fileObj);
-              } catch (error) {
-                console.error('Error creating file object for DAT:', error);
-                alert(`Error processing DAT file: ${error.message}`);
-              }
-            }
-          }).catch(error => {
-            console.error('Error in DAT file fetch promise:', error);
-          });
-        }
-      }
-
+      // Handle different file types
       if (ext === 'cp') {
+        setIsLoadingCP(true);
         setParsedCpData(null);
         setSections([]);
         setSelectedLevel('');
         setSelectedSection('');
+        setLevels([]);
 
-        if (file.file) {
-          console.log('Processing CP file from folder import');
-          parseCpFile(file.file);
-        } else {
-          console.log('Processing CP file from server');
-          fetchServerFile(file).then(content => {
-            if (content) {
-              try {
-                const blob = new Blob([content], { type: 'text/plain' });
-                const fileObj = new File([blob], file.name, { type: 'text/plain' });
-                parseCpFile(fileObj);
-              } catch (error) {
-                console.error('Error creating file object for CP:', error);
-                alert(`Error processing CP file: ${error.message}`);
+        const parsedData = await sendFileToServer(file, 'cp');
+        setIsLoadingCP(false);
+
+        if (parsedData) {
+          console.log('CP Data received:', parsedData);
+          setParsedCpData(parsedData);
+
+          // Create level options from parsed data
+          if (parsedData.levels && Object.keys(parsedData.levels).length > 0) {
+            const levelOptions = Object.entries(parsedData.levels).map(([levelKey, levelData]) => {
+              // Extract level number from levelKey (e.g., "level1" -> 1)
+              const levelMatch = levelKey.match(/level(\d+)/);
+              const levelNumber = levelMatch ? parseInt(levelMatch[1]) : 1;
+
+              // Also try to get level from flowParameters if available
+              let actualLevelNumber = levelNumber;
+              if (levelData.flowParameters) {
+                const flowLevelMatch = levelData.flowParameters.match(/LEV=\s*(\d+)/);
+                if (flowLevelMatch) {
+                  actualLevelNumber = parseInt(flowLevelMatch[1]);
+                }
               }
-            }
-          }).catch(error => {
-            console.error('Error in CP file fetch promise:', error);
-          });
+
+              return {
+                value: levelKey, // Use the actual key like "level1"
+                label: `Level ${actualLevelNumber}`,
+                actualLevelNumber: actualLevelNumber,
+                data: levelData
+              };
+            });
+
+            console.log('Level options created:', levelOptions);
+            setLevels(levelOptions);
+          }
         }
       }
 
       if (ext === 'forces') {
+        setIsLoadingForces(true);
         setParsedForcesData(null);
 
-        if (file.file) {
-          console.log('Processing Forces file from folder import');
-          parseForcesFile(file.file);
-        } else {
-          console.log('Processing Forces file from server');
-          fetchServerFile(file).then(content => {
-            if (content) {
-              try {
-                const blob = new Blob([content], { type: 'text/plain' });
-                const fileObj = new File([blob], file.name, { type: 'text/plain' });
-                parseForcesFile(fileObj);
-              } catch (error) {
-                console.error('Error creating file object for Forces:', error);
-                alert(`Error processing Forces file: ${error.message}`);
-              }
+        const parsedData = await sendFileToServer(file, 'forces');
+        setIsLoadingForces(false);
+
+        if (parsedData) {
+          console.log('Forces Data received:', parsedData);
+          setParsedForcesData(parsedData);
+
+          // Update coefficients with the last level's data
+          if (parsedData.levels && Object.keys(parsedData.levels).length > 0) {
+            const levelKeys = Object.keys(parsedData.levels);
+            const lastLevelKey = levelKeys[levelKeys.length - 1];
+            const lastLevel = parsedData.levels[lastLevelKey];
+
+            if (lastLevel.vfpCoefficients) {
+              setCoefficients({
+                CL: lastLevel.vfpCoefficients.CL || 0.000000,
+                CD: lastLevel.vfpCoefficients.CD || 0.000000,
+                CM: lastLevel.vfpCoefficients.CM || 0.000000
+              });
             }
-          }).catch(error => {
-            console.error('Error in Forces file fetch promise:', error);
-          });
+
+            const newDragBreakdown = {
+              cdInduced: lastLevel.vortexCoefficients?.CD || 0.000,
+              cdViscous: lastLevel.viscousDragData?.totalViscousDrag || 0.000,
+              cdWave: 0.000
+            };
+
+            setDragBreakdown(newDragBreakdown);
+          }
+        }
+      }
+
+      if (ext === 'dat') {
+        setIsLoadingDAT(true);
+
+        const parsedData = await sendFileToServer(file, 'dat');
+        setIsLoadingDAT(false);
+
+        if (parsedData) {
+          console.log('DAT file parsed successfully:', parsedData);
         }
       }
     }
-  };
-
-  const parseFileContent = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (e) => reject(e);
-      reader.readAsText(file);
-    });
   };
 
   // Mesh button handler
@@ -454,39 +630,18 @@ function PostProcessing() {
       return;
     }
 
-    const levelIndex = parseInt(selectedLevel) - 1;
-    console.log('levelIndex:', levelIndex);
-
-    if (levelIndex < 0 || levelIndex >= parsedCpData.levels.length) {
-      console.log('Invalid level index:', levelIndex, 'Available levels:', parsedCpData.levels.length);
+    if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
+      console.log('Level not found in CP data');
       return;
     }
 
-    const level = parsedCpData.levels[levelIndex];
+    const level = parsedCpData.levels[selectedLevel];
     const sections = level.sections;
-    console.log('CP Level:', level);
-    console.log('Sections count:', sections?.length);
 
-    if (!sections || sections.length === 0) {
+    if (!sections || Object.keys(sections).length === 0) {
       console.log('No sections found in level');
       return;
     }
-
-    // Get the actual level number from the CP data
-    const actualLevelMatch = level.flowParameters.match(/LEV=\s*(\d+)/);
-    const actualLevelNumber = actualLevelMatch ? parseInt(actualLevelMatch[1]) : parseInt(selectedLevel);
-    console.log('Actual level number from CP file:', actualLevelNumber);
-
-    // Get forces data for the actual level number
-    const forcesLevel = parsedForcesData.levels.find(l => l.level === actualLevelNumber);
-    console.log('Forces level found:', forcesLevel);
-
-    if (!forcesLevel) {
-      console.log('No matching forces level found for actual level:', actualLevelNumber);
-      return;
-    }
-
-    console.log('Processing sections for mesh...');
 
     const meshLines = [];
     const allX = [];
@@ -494,142 +649,44 @@ function PostProcessing() {
     const allZ = [];
 
     // Process each section to build the mesh
-    sections.forEach((section, sectionIndex) => {
-      console.log(`Processing section ${sectionIndex + 1}:`, section);
+    Object.values(sections).forEach((section, sectionIndex) => {
+      if (!section['X/C'] || !section['Z/C']) return;
 
-      const mainTable = section.mainTable;
-      if (!mainTable || mainTable.length === 0) {
-        console.log(`Section ${sectionIndex + 1} has no main table data`);
-        return;
-      }
+      const xCoords = section['X/C'];
+      const zCoords = section['Z/C'];
 
-      console.log(`Section ${sectionIndex + 1} main table length:`, mainTable.length);
-
-      // Get YAVE from forces data for this section
+      // Get YAVE from section coefficients
       let yave = 0;
-      if (forcesLevel.data && forcesLevel.data[sectionIndex]) {
-        yave = forcesLevel.data[sectionIndex].YAVE || 0;
-        console.log(`Section ${sectionIndex + 1} YAVE:`, yave);
-      } else {
-        console.log(`No YAVE data for section ${sectionIndex + 1}`);
+      if (section.coefficients && section.coefficients.YAVE !== undefined) {
+        yave = section.coefficients.YAVE;
       }
-
-      // Extract coordinates for this section
-      const sectionX = [];
-      const sectionY = [];
-      const sectionZ = [];
-
-      mainTable.forEach((row, rowIndex) => {
-        if (row.length >= 2) {
-          // Use X/C and Z/C from columns 0 and 1
-          const xCoord = typeof row[0] === 'number' ? row[0] : 0;
-          const zCoord = typeof row[1] === 'number' ? row[1] : 0;
-
-          if (rowIndex < 3) {
-            console.log(`Section ${sectionIndex + 1}, Row ${rowIndex}:`, {
-              xCoord: xCoord,
-              zCoord: zCoord,
-              yave: yave
-            });
-          }
-
-          sectionX.push(xCoord);
-          sectionY.push(yave);
-          sectionZ.push(zCoord);
-
-          allX.push(xCoord);
-          allY.push(yave);
-          allZ.push(zCoord);
-        }
-      });
-
-      console.log(`Section ${sectionIndex + 1} processed:`, {
-        pointCount: sectionX.length,
-        xRange: [Math.min(...sectionX), Math.max(...sectionX)],
-        zRange: [Math.min(...sectionZ), Math.max(...sectionZ)],
-        yValue: yave
-      });
 
       // Create chordwise lines
-      if (sectionX.length > 1) {
-        for (let i = 0; i < sectionX.length - 1; i++) {
-          meshLines.push({
-            x: [sectionX[i], sectionX[i + 1]],
-            y: [sectionY[i], sectionY[i + 1]],
-            z: [sectionZ[i], sectionZ[i + 1]],
-            mode: 'lines',
-            type: 'scatter3d',
-            line: { color: 'blue', width: 2 },
-            showlegend: false,
-            hoverinfo: 'skip'
-          });
-        }
+      for (let i = 0; i < xCoords.length - 1; i++) {
+        meshLines.push({
+          x: [xCoords[i], xCoords[i + 1]],
+          y: [yave, yave],
+          z: [zCoords[i], zCoords[i + 1]],
+          mode: 'lines',
+          type: 'scatter3d',
+          line: { color: '#334155', width: 2 }, // Professional slate color
+          showlegend: false,
+          hoverinfo: 'skip'
+        });
       }
+
+      // Collect all points
+      xCoords.forEach((x, idx) => {
+        allX.push(x);
+        allY.push(yave);
+        allZ.push(zCoords[idx]);
+      });
     });
-
-    // Create spanwise lines
-    console.log('Creating spanwise lines...');
-    const sectionsData = [];
-
-    sections.forEach((section, sectionIndex) => {
-      const mainTable = section.mainTable;
-      if (!mainTable || mainTable.length === 0) return;
-
-      let yave = 0;
-      if (forcesLevel.data && forcesLevel.data[sectionIndex]) {
-        yave = forcesLevel.data[sectionIndex].YAVE || 0;
-      }
-
-      const sectionPoints = mainTable.map(row => ({
-        x: typeof row[0] === 'number' ? row[0] : 0,
-        y: yave,
-        z: typeof row[1] === 'number' ? row[1] : 0
-      }));
-
-      sectionsData.push(sectionPoints);
-    });
-
-    // Create spanwise connections between sections
-    if (sectionsData.length > 1) {
-      for (let sectionIdx = 0; sectionIdx < sectionsData.length - 1; sectionIdx++) {
-        const currentSection = sectionsData[sectionIdx];
-        const nextSection = sectionsData[sectionIdx + 1];
-
-        const minLength = Math.min(currentSection.length, nextSection.length);
-
-        for (let pointIdx = 0; pointIdx < minLength; pointIdx++) {
-          const currentPoint = currentSection[pointIdx];
-          const nextPoint = nextSection[pointIdx];
-
-          meshLines.push({
-            x: [currentPoint.x, nextPoint.x],
-            y: [currentPoint.y, nextPoint.y],
-            z: [currentPoint.z, nextPoint.z],
-            mode: 'lines',
-            type: 'scatter3d',
-            line: { color: 'blue', width: 1 },
-            showlegend: false,
-            hoverinfo: 'skip'
-          });
-        }
-      }
-    }
-
-    console.log('Final mesh lines count:', meshLines.length);
-    console.log('Total points:', allX.length);
-    console.log('X range:', [Math.min(...allX), Math.max(...allX)]);
-    console.log('Y range:', [Math.min(...allY), Math.max(...allY)]);
-    console.log('Z range:', [Math.min(...allZ), Math.max(...allZ)]);
-
-    if (meshLines.length === 0) {
-      console.log('No mesh lines generated');
-      return;
-    }
 
     const meshPlotData = {
       data: meshLines,
       layout: {
-        title: `CFD Mesh Visualization - Level ${actualLevelNumber}`,
+        title: `CFD Mesh Visualization - Level ${selectedLevel}`,
         scene: {
           xaxis: {
             title: 'X/C',
@@ -660,16 +717,8 @@ function PostProcessing() {
       }
     };
 
-    console.log('Generated mesh plot data with', meshLines.length, 'lines');
     setMeshData(meshPlotData);
   };
-
-  useEffect(() => {
-    if (selectedLevel && selectedSpanwiseCoeff && parsedCpData && showSpanwiseDistribution) {
-      generateSpanwisePlotData();
-    }
-  }, [selectedLevel, selectedSpanwiseCoeff, parsedCpData, showSpanwiseDistribution]);
-
 
   // Add spanwise distribution button handler
   const handleSpanwiseDistributionClick = () => {
@@ -685,170 +734,45 @@ function PostProcessing() {
       setShowSpanwiseDistribution(true);
       setShowMesh(false);
       setMeshData(null);
-      generateSpanwisePlotData();
     }
   };
-
-  // Generate spanwise distribution plot data
-  const generateSpanwisePlotData = () => {
-    console.log('generateSpanwisePlotData called');
-
-    if (!parsedCpData || !selectedLevel) {
-      console.log('Missing CP data or level selection');
-      return;
-    }
-
-    const levelIndex = parseInt(selectedLevel) - 1;
-    console.log('levelIndex:', levelIndex);
-
-    if (levelIndex < 0 || levelIndex >= parsedCpData.levels.length) {
-      console.log('Invalid level index:', levelIndex, 'Available levels:', parsedCpData.levels.length);
-      return;
-    }
-
-    const level = parsedCpData.levels[levelIndex];
-    const sections = level.sections;
-    console.log('CP Level:', level);
-    console.log('Sections count:', sections?.length);
-
-    if (!sections || sections.length === 0) {
-      console.log('No sections found in level');
-      return;
-    }
-
-    // Extract YAVE and coefficient values from section headers
-    const yaveValues = [];
-    const coeffValues = [];
-
-    sections.forEach((section, index) => {
-      console.log(`Processing section ${index + 1} header:`, section.sectionHeader);
-
-      // Parse section header for YAVE and coefficient values
-      const yaveMatch = section.sectionHeader.match(/YAVE=\s*([\d.-]+)/);
-      let coeffMatch;
-
-      switch (selectedSpanwiseCoeff) {
-        case 'CL':
-          coeffMatch = section.sectionHeader.match(/CL=\s*([\d.-]+)/);
-          break;
-        case 'CD':
-          coeffMatch = section.sectionHeader.match(/CD=\s*([\d.-]+)/);
-          break;
-        case 'CM':
-          coeffMatch = section.sectionHeader.match(/CM=\s*([\d.-]+)/);
-          break;
-        default:
-          coeffMatch = section.sectionHeader.match(/CL=\s*([\d.-]+)/);
-      }
-
-      if (yaveMatch && coeffMatch) {
-        const yave = parseFloat(yaveMatch[1]);
-        const coeff = parseFloat(coeffMatch[1]);
-
-        console.log(`Section ${index + 1}: YAVE=${yave}, ${selectedSpanwiseCoeff}=${coeff}`);
-
-        yaveValues.push(yave);
-        coeffValues.push(coeff);
-      } else {
-        console.log(`Section ${index + 1}: Missing YAVE or ${selectedSpanwiseCoeff} in header`);
-      }
-    });
-
-    console.log('YAVE values:', yaveValues);
-    console.log(`${selectedSpanwiseCoeff} values:`, coeffValues);
-
-    if (yaveValues.length === 0 || coeffValues.length === 0) {
-      console.log('No valid data found for spanwise distribution');
-      return;
-    }
-
-    // Create plot data
-    const plotColor = selectedSpanwiseCoeff === 'CL' ? 'blue' :
-      selectedSpanwiseCoeff === 'CD' ? 'red' : 'green';
-
-    const spanwisePlotData = [{
-      x: yaveValues,
-      y: coeffValues,
-      type: 'scatter',
-      mode: 'lines+markers',
-      line: { color: plotColor, width: 2 },
-      marker: { color: plotColor, size: 6 },
-      name: `${selectedSpanwiseCoeff} vs YAVE`
-    }];
-
-    const spanwisePlotLayout = {
-      title: `Spanwise Distribution - ${selectedSpanwiseCoeff} vs YAVE (Level ${selectedLevel})`,
-      xaxis: {
-        title: 'YAVE',
-        showgrid: true,
-        zeroline: true,
-        showticklabels: true
-      },
-      yaxis: {
-        title: selectedSpanwiseCoeff,
-        showgrid: true,
-        zeroline: true,
-        showticklabels: true
-      },
-      margin: { l: 60, r: 40, t: 60, b: 60 },
-      showlegend: false,
-      plot_bgcolor: 'white',
-      paper_bgcolor: 'white'
-    };
-
-    const spanwiseFullData = {
-      data: spanwisePlotData,
-      layout: spanwisePlotLayout,
-      config: {
-        displayModeBar: true,
-        displaylogo: false,
-        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-      }
-    };
-
-    console.log('Generated spanwise plot data');
-    setSpanwiseData(spanwiseFullData);
-  };
-
-
-
-
 
   // Generate 2D plot data
-  const generatePlotData = () => {
+  const generatePlot1Data = () => {
     if (!parsedCpData || !selectedLevel || !selectedSection) return;
 
-    const levelIndex = parseInt(selectedLevel) - 1;
-    const sectionIndex = parseInt(selectedSection) - 1;
+    console.log('Generating plot1 data for level:', selectedLevel, 'section:', selectedSection);
 
-    if (levelIndex < 0 || levelIndex >= parsedCpData.levels.length) return;
-    if (sectionIndex < 0 || sectionIndex >= parsedCpData.levels[levelIndex].sections.length) return;
-
-    const section = parsedCpData.levels[levelIndex].sections[sectionIndex];
-
-    generatePlot1Data(section);
-    generatePlot2Data(section);
-  };
-
-  const generatePlot1Data = (section) => {
-    const data = section.mainTable;
-    if (!data || data.length === 0) {
+    if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
+      console.log('Level not found:', selectedLevel);
       setPlotData1(null);
       return;
     }
 
-    const xValues = data.map(row => row[0]).filter(val => typeof val === 'number');
+    const level = parsedCpData.levels[selectedLevel];
+    if (!level.sections || !level.sections[selectedSection]) {
+      console.log('Section not found:', selectedSection);
+      setPlotData1(null);
+      return;
+    }
+
+    const section = level.sections[selectedSection];
+    console.log('Section data:', section);
+
+    // Use the correct data structure from readCP
+    const xValues = section['X/C'] || [];
     const yValues = selectedPlotType === 'Cp'
-      ? data.map(row => row[2]).filter(val => typeof val === 'number')
-      : data.map(row => row[4]).filter(val => typeof val === 'number');
+      ? (section['CP'] || [])
+      : (section['M'] || []);
+
+    console.log('Plot data:', { xValues: xValues.length, yValues: yValues.length });
 
     if (xValues.length === 0 || yValues.length === 0) {
       setPlotData1(null);
       return;
     }
 
-    const plotColor = selectedPlotType === 'Cp' ? 'blue' : 'red';
-    const yAxisTitle = selectedPlotType === 'Cp' ? 'CP' : 'Mach';
+    const plotColor = '#334155'; // Professional slate color for all plots
 
     const plot1Data = [{
       x: xValues,
@@ -898,15 +822,25 @@ function PostProcessing() {
     });
   };
 
-  const generatePlot2Data = (section) => {
-    const data = section.mainTable;
-    if (!data || data.length === 0) {
+  const generatePlot2Data = () => {
+    if (!parsedCpData || !selectedLevel || !selectedSection) return;
+
+    if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
       setPlotData2(null);
       return;
     }
 
-    const xValues = data.map(row => row[0]).filter(val => typeof val === 'number');
-    const zValues = data.map(row => row[1]).filter(val => typeof val === 'number');
+    const level = parsedCpData.levels[selectedLevel];
+    if (!level.sections || !level.sections[selectedSection]) {
+      setPlotData2(null);
+      return;
+    }
+
+    const section = level.sections[selectedSection];
+
+    // Use the correct data structure from readCP
+    const xValues = section['X/C'] || [];
+    const zValues = section['Z/C'] || [];
 
     if (xValues.length === 0 || zValues.length === 0) {
       setPlotData2(null);
@@ -918,8 +852,8 @@ function PostProcessing() {
       y: zValues,
       type: 'scatter',
       mode: 'lines+markers',
-      line: { color: 'black', width: 2 },
-      marker: { color: 'black', size: 4 },
+      line: { color: '#334155', width: 2 }, // Professional slate color
+      marker: { color: '#334155', size: 4 },
       name: 'Z/C vs X/C'
     }];
 
@@ -954,517 +888,30 @@ function PostProcessing() {
     });
   };
 
-  // Parse CP file
-  const parseCpFile = async (file) => {
-    try {
-      const content = await parseFileContent(file);
-      const lines = content.split('\n');
-
-      const cpData = {
-        fileName: file.name,
-        metadata: {
-          totalLines: lines.length,
-          parsedAt: new Date().toISOString()
-        },
-        simulationMetadata: null,
-        levels: []
-      };
-
-      let lineIndex = 0;
-
-      // Skip empty lines at the beginning
-      while (lineIndex < lines.length && !lines[lineIndex].trim()) {
-        lineIndex++;
-      }
-
-      // First non-empty line: simulation metadata
-      if (lineIndex < lines.length) {
-        cpData.simulationMetadata = lines[lineIndex].trim();
-        lineIndex++;
-      }
-
-      // Parse levels
-      while (lineIndex < lines.length) {
-        const line = lines[lineIndex].trim();
-
-        if (line.startsWith('LEV= ')) {
-          const level = {
-            flowParameters: line,
-            sections: []
-          };
-
-          lineIndex++;
-
-          // Parse sections within this level
-          while (lineIndex < lines.length) {
-            // Skip empty lines
-            while (lineIndex < lines.length && !lines[lineIndex].trim()) {
-              lineIndex++;
-            }
-
-            if (lineIndex >= lines.length) break;
-
-            const sectionLine = lines[lineIndex].trim();
-
-            // Check if we've reached the next level
-            if (sectionLine.startsWith('LEV= ')) {
-              lineIndex--;
-              break;
-            }
-
-            // Check for section header
-            if (sectionLine.startsWith('J= ')) {
-              const section = {
-                sectionHeader: sectionLine,
-                mainTable: [],
-                vortexSheetTable: [],
-                coefficients: {}
-              };
-
-
-              // Parse coefficient values from section header
-              const yaveMatch = sectionLine.match(/YAVE=\s*([\d.-]+)/);
-              const clMatch = sectionLine.match(/CL=\s*([\d.-]+)/);
-              const cdMatch = sectionLine.match(/CD=\s*([\d.-]+)/);
-              const cmMatch = sectionLine.match(/CM=\s*([\d.-]+)/);
-              const chordMatch = sectionLine.match(/CHORD=\s*([\d.-]+)/);
-              const twistMatch = sectionLine.match(/TWIST=\s*([\d.-]+)/);
-              const gamMatch = sectionLine.match(/GAM=\s*([\d.-]+)/);
-
-              if (yaveMatch) section.coefficients.YAVE = parseFloat(yaveMatch[1]);
-              if (clMatch) section.coefficients.CL = parseFloat(clMatch[1]);
-              if (cdMatch) section.coefficients.CD = parseFloat(cdMatch[1]);
-              if (cmMatch) section.coefficients.CM = parseFloat(cmMatch[1]);
-              if (chordMatch) section.coefficients.CHORD = parseFloat(chordMatch[1]);
-              if (twistMatch) section.coefficients.TWIST = parseFloat(twistMatch[1]);
-              if (gamMatch) section.coefficients.GAM = parseFloat(gamMatch[1]);
-
-              console.log(`Section coefficients extracted:`, section.coefficients);
-
-
-              lineIndex++;
-
-              // Skip empty lines until we reach the main table
-              while (lineIndex < lines.length && !lines[lineIndex].trim()) {
-                lineIndex++;
-              }
-
-              // Read main table data
-              while (lineIndex < lines.length) {
-                const dataLine = lines[lineIndex].trim();
-
-                if (!dataLine) {
-                  break;
-                }
-
-                if (dataLine.startsWith('J= ') || dataLine.startsWith('LEV= ')) {
-                  lineIndex--;
-                  break;
-                }
-
-                const values = dataLine.split(/\s+/);
-                if (values.length > 0) {
-                  const parsedValues = values.map(value => {
-                    const numValue = parseFloat(value);
-                    return isNaN(numValue) ? value : numValue;
-                  });
-                  section.mainTable.push(parsedValues);
-                }
-
-                lineIndex++;
-              }
-
-              // Skip empty lines after main table
-              while (lineIndex < lines.length && !lines[lineIndex].trim()) {
-                lineIndex++;
-              }
-
-              // Read vortex sheet table data
-              while (lineIndex < lines.length) {
-                const vortexDataLine = lines[lineIndex].trim();
-
-                if (vortexDataLine.startsWith('J= ') || vortexDataLine.startsWith('LEV= ')) {
-                  lineIndex--;
-                  break;
-                }
-
-                if (!vortexDataLine) {
-                  lineIndex++;
-                  continue;
-                }
-
-                const vortexValues = vortexDataLine.split(/\s+/);
-                if (vortexValues.length > 0) {
-                  const parsedVortexValues = vortexValues.map(value => {
-                    const numValue = parseFloat(value);
-                    return isNaN(numValue) ? value : numValue;
-                  });
-                  section.vortexSheetTable.push(parsedVortexValues);
-                }
-
-                lineIndex++;
-              }
-
-              level.sections.push(section);
-            } else {
-              lineIndex++;
-            }
-          }
-
-          cpData.levels.push(level);
-        } else {
-          lineIndex++;
-        }
-      }
-
-      setParsedCpData(cpData);
-
-      // Create level options from CP file data
-      if (cpData.levels.length > 0) {
-        const levelOptions = cpData.levels.map((level, index) => {
-          const levelMatch = level.flowParameters.match(/LEV=\s*(\d+)/);
-          const levelNumber = levelMatch ? parseInt(levelMatch[1]) : index + 1;
-
-          return {
-            value: index + 1,
-            label: `Level ${levelNumber}`,
-            actualLevelNumber: levelNumber,
-            data: level
-          };
-        });
-
-        setLevels(levelOptions);
-        console.log('Set levels from CP file:', levelOptions);
-      }
-
-      console.log('Parsed CP file JSON:', cpData);
-
-    } catch (error) {
-      console.error('Error parsing .cp file:', error);
-    }
-  };
-
-  // Parse DAT file
-  const extractLevelsAndFuse = (content) => {
-    const lines = content.split('\n');
-    const result = {
-      title: '',
-      fuse: [],
-      levels: {}
-    };
-
-    let lineIndex = 0;
-
-    // Skip empty lines at the beginning
-    while (lineIndex < lines.length && !lines[lineIndex].trim()) {
-      lineIndex++;
-    }
-
-    // First line is the title
-    if (lineIndex < lines.length) {
-      result.title = lines[lineIndex].trim();
-      lineIndex++;
-    }
-
-    // Skip empty lines
-    while (lineIndex < lines.length && !lines[lineIndex].trim()) {
-      lineIndex++;
-    }
-
-    // Second line indicates fuselage data count
-    let fuseDataCount = 0;
-    if (lineIndex < lines.length) {
-      const fuseCountLine = lines[lineIndex].trim();
-      fuseDataCount = parseInt(fuseCountLine);
-      lineIndex++;
-    }
-
-    // Read fuse data if count > 0
-    if (fuseDataCount > 0) {
-      for (let i = 0; i < fuseDataCount && lineIndex < lines.length; i++) {
-        const fuseLine = lines[lineIndex].trim();
-        if (fuseLine) {
-          result.fuse.push(fuseLine + '\n');
-        }
-        lineIndex++;
-      }
-    }
-
-    // Parse level data
-    let levelCount = 0;
-    while (lineIndex < lines.length) {
-      const line = lines[lineIndex].trim();
-
-      const levelMatch = line.match(/^2\s+(\d{20})/);
-      if (levelMatch) {
-        levelCount++;
-        const twentyDigitNumber = levelMatch[1];
-        const levelNumber = parseInt(twentyDigitNumber.charAt(1));
-
-        const levelKey = `level${levelCount}`;
-        result.levels[levelKey] = [];
-
-        result.levels[levelKey].push(line + '\n');
-        lineIndex++;
-
-        // Read next 14 lines for this level
-        for (let i = 0; i < 14 && lineIndex < lines.length; i++) {
-          const levelLine = lines[lineIndex];
-          if (levelLine !== undefined) {
-            result.levels[levelKey].push(levelLine + '\n');
-          }
-          lineIndex++;
-        }
-      } else {
-        lineIndex++;
-      }
-    }
-
-    return result;
-  };
-
-  const parseDatFile = async (file) => {
-    try {
-      const content = await parseFileContent(file);
-      const extractedData = extractLevelsAndFuse(content);
-
-      setParsedDatData(extractedData);
-
-      // Don't set levels from DAT file anymore - CP file will handle this
-      console.log('Parsed DAT file JSON:', extractedData);
-
-    } catch (error) {
-      console.error('Error parsing .dat file:', error);
-    }
-  };
-
-  // Parse Forces file
-  const parseViscousDragData = (lines, startIndex) => {
-    const viscousData = {
-      header: lines[startIndex],
-      columns: [],
-      data: [],
-      totalViscousDrag: null,
-      totalViscousDragTE: null
-    };
-
-    let headerIndex = startIndex + 1;
-    while (headerIndex < lines.length && !lines[headerIndex].trim().includes('THETA')) {
-      headerIndex++;
-    }
-
-    if (headerIndex < lines.length) {
-      const headerLine = lines[headerIndex].trim();
-      viscousData.columns = headerLine.split(/\s+/);
-
-      for (let i = headerIndex + 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-
-        if (line.includes('Total viscous drag =')) {
-          const match = line.match(/Total viscous drag\s*=\s*([\d.-]+)/);
-          if (match) {
-            viscousData.totalViscousDrag = parseFloat(match[1]);
-          }
-          continue;
-        }
-
-        if (line.includes('Total viscous drag te =')) {
-          const match = line.match(/Total viscous drag te\s*=\s*([\d.-]+)/);
-          if (match) {
-            viscousData.totalViscousDragTE = parseFloat(match[1]);
-          }
-          continue;
-        }
-
-        if (!line || line.includes('Total viscous drag') || line.includes('LEV=')) break;
-
-        const values = line.split(/\s+/);
-        if (values.length >= viscousData.columns.length) {
-          const rowData = {};
-          viscousData.columns.forEach((col, index) => {
-            rowData[col] = isNaN(parseFloat(values[index])) ? values[index] : parseFloat(values[index]);
-          });
-          viscousData.data.push(rowData);
-        }
-      }
-    }
-
-    return viscousData;
-  };
-
-  const parseLevel = (lines, startIndex) => {
-    const levelLine = lines[startIndex].trim();
-    const levelMatch = levelLine.match(/LEV=\s*(\d+)/);
-    const itsMatch = levelLine.match(/ITS=\s*(\d+)/);
-    const machMatch = levelLine.match(/MACH\s+NO=\s*([\d.]+)/);
-    const alphaMatch = levelLine.match(/ALPHA=\s*([\d.-]+)/);
-
-    if (!levelMatch) return null;
-
-    const level = {
-      level: parseInt(levelMatch[1]),
-      iterations: itsMatch ? parseInt(itsMatch[1]) : null,
-      machNumber: machMatch ? parseFloat(machMatch[1]) : null,
-      alpha: alphaMatch ? parseFloat(alphaMatch[1]) : null,
-      rawLine: levelLine,
-      data: [],
-      coefficients: null,
-      viscousDragData: null,
-      vfpCoefficients: null,
-      ibeCoefficients: null,
-      vortexCoefficients: null,
-      wingArea: null
-    };
-
-    // Find the data table header
-    let headerIndex = startIndex + 1;
-    while (headerIndex < lines.length && !lines[headerIndex].includes('J   YAVE')) {
-      headerIndex++;
-    }
-
-    if (headerIndex < lines.length) {
-      const columns = ['J', 'YAVE', 'YAVE/YTIP', 'TWIST(deg)', 'CHORD', 'CL', 'CD', 'CM', 'GAM', 'NLEPOS'];
-
-      for (let i = headerIndex + 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line || line.includes('CLTOT') || line.includes('LEV=')) break;
-
-        const values = line.split(/\s+/);
-        if (values.length >= columns.length) {
-          const rowData = {};
-          columns.forEach((col, index) => {
-            rowData[col] = isNaN(parseFloat(values[index])) ? values[index] : parseFloat(values[index]);
-          });
-          level.data.push(rowData);
-        }
-      }
-    }
-
-    // Find all coefficient lines
-    for (let i = headerIndex; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (line.includes('CLTOT(VFP)')) {
-        const clMatch = line.match(/CLTOT\(VFP\)=\s*([\d.-]+)/);
-        const cdMatch = line.match(/CDTOT\(VFP\)=\s*([\d.-]+)/);
-        const cmMatch = line.match(/CMTOT\(VFP\)=\s*([\d.-]+)/);
-        const areaMatch = line.match(/WING AREA\(TOTAL\)=\s*([\d.-]+)/);
-
-        level.vfpCoefficients = {
-          CL: clMatch ? parseFloat(clMatch[1]) : null,
-          CD: cdMatch ? parseFloat(cdMatch[1]) : null,
-          CM: cmMatch ? parseFloat(cmMatch[1]) : null
-        };
-
-        level.wingArea = areaMatch ? parseFloat(areaMatch[1]) : null;
-        level.coefficients = level.vfpCoefficients;
-        continue;
-      }
-
-      if (line.includes('CLTOT(IBE)')) {
-        const clMatch = line.match(/CLTOT\(IBE\)=\s*([\d.-]+)/);
-        const cdMatch = line.match(/CDTOT\(IBE\)=\s*([\d.-]+)/);
-
-        level.ibeCoefficients = {
-          CL: clMatch ? parseFloat(clMatch[1]) : null,
-          CD: cdMatch ? parseFloat(cdMatch[1]) : null
-        };
-        continue;
-      }
-
-      if (line.includes('CL(vortd)')) {
-        const clMatch = line.match(/CL\(vortd\)\s*=\s*([\d.-]+)/);
-        const cdMatch = line.match(/CD\(vortd\)\s*=\s*([\d.-]+)/);
-        const dcdMatch = line.match(/DCD\(vortd\)\s*=\s*([\d.-]+)/);
-
-        level.vortexCoefficients = {
-          CL: clMatch ? parseFloat(clMatch[1]) : null,
-          CD: cdMatch ? parseFloat(cdMatch[1]) : null,
-          DCD: dcdMatch ? parseFloat(dcdMatch[1]) : null
-        };
-        continue;
-      }
-
-      if (line.includes('LEV=')) break;
-    }
-
-    // Find viscous drag data
-    for (let i = headerIndex; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line.includes('***************** VISCOUS DRAG DATA *****************')) {
-        level.viscousDragData = parseViscousDragData(lines, i);
-        break;
-      }
-      if (line.includes('LEV=')) break;
-    }
-
-    return level;
-  };
-
-  const parseForcesFile = async (file) => {
-    try {
-      const content = await parseFileContent(file);
-      const lines = content.split('\n');
-
-      const forcesData = {
-        fileName: file.name,
-        levels: [],
-        metadata: {
-          totalLines: lines.length,
-          parsedAt: new Date().toISOString()
-        }
-      };
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line.includes('LEV=')) {
-          const level = parseLevel(lines, i);
-          if (level) {
-            forcesData.levels.push(level);
-          }
-        }
-      }
-
-      setParsedForcesData(forcesData);
-
-      // Update coefficients with the last level's data
-      if (forcesData.levels.length > 0) {
-        const lastLevel = forcesData.levels[forcesData.levels.length - 1];
-
-        if (lastLevel.coefficients) {
-          setCoefficients(lastLevel.coefficients);
-        }
-
-        const newDragBreakdown = {
-          cdInduced: lastLevel.vortexCoefficients?.CD || 0.000,
-          cdViscous: lastLevel.viscousDragData?.totalViscousDrag || 0.000,
-          cdWave: 0.000
-        };
-
-        setDragBreakdown(newDragBreakdown);
-      }
-
-      console.log('Parsed Forces file JSON:', forcesData);
-
-    } catch (error) {
-      console.error('Error parsing .forces file:', error);
-    }
-  };
-
   const handleBoundaryLayerClick = () => {
-    navigate('/post-processing/boundary-layer', { state: { simulationFolder: simulationData, simName: simulationData?.simName } });
+    navigate('/post-processing/boundary-layer', {
+      state: {
+        simulationFolder: simulationData,
+        simName: simulationData?.simName
+      }
+    });
   };
 
   // Render file explorer
   const renderFileExplorer = () => {
-    console.log('Rendering file explorer with simulationData:', simulationData);
-
     if (!simulationData) {
-      console.log('No simulation data available');
       return (
-        <div className="empty-explorer">
-          <p>No simulation data loaded</p>
-          <button onClick={handleImportFolder} className="import-folder-btn">
+        <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+          <div className="text-gray-400 mb-4">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <p className="text-gray-600 mb-4">No simulation data loaded</p>
+          <button
+            onClick={handleImportFolder}
+            className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+          >
             Import Folder
           </button>
         </div>
@@ -1472,80 +919,81 @@ function PostProcessing() {
     }
 
     const files = simulationData.files || {};
-    console.log('Files object:', files);
-    console.log('Files object keys:', Object.keys(files));
-    console.log('Files object type:', typeof files);
-
     const hasFiles = Object.keys(files).some(fileType =>
       Array.isArray(files[fileType]) && files[fileType].length > 0
     );
 
-    console.log('Has files:', hasFiles);
-
     if (!hasFiles) {
       return (
-        <div className="empty-explorer">
-          <h3>{simulationData.simName}</h3>
-          <p>No files found in the simulation folder</p>
-          <button onClick={handleImportFolder} className="import-folder-btn">
+        <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">{simulationData.simName}</h3>
+          <p className="text-gray-600 mb-4">No files found in the simulation folder</p>
+          <button
+            onClick={handleImportFolder}
+            className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2"
+          >
             Import Different Folder
           </button>
-          <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-            Debug: {JSON.stringify(simulationData, null, 2)}
-          </div>
         </div>
       );
     }
 
     return (
-      <div className="file-explorer-content">
-        <div className="explorer-header">
-          <h3>{simulationData.simName}</h3>
-          <div className="selected-files-info">
-            <div className={`file-status ${selectedFiles.dat ? 'selected' : ''}`}>
-              DAT: {selectedFiles.dat ? '✓' : '✗'}
+      <div className="h-full flex flex-col">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">{simulationData.simName}</h3>
+          <div className="space-y-1">
+            <div className={`text-xs px-2 py-1 rounded-md font-medium ${selectedFiles.dat ? 'bg-slate-100 text-slate-800' : 'bg-gray-100 text-gray-600'}`}>
+              DAT: {isLoadingDAT ? '⏳ Loading...' : selectedFiles.dat ? '✓ Loaded' : '○ Not loaded'}
             </div>
-            <div className={`file-status ${selectedFiles.cp ? 'selected' : ''}`}>
-              CP: {selectedFiles.cp ? '✓' : '✗'}
+            <div className={`text-xs px-2 py-1 rounded-md font-medium ${selectedFiles.cp ? 'bg-slate-100 text-slate-800' : 'bg-gray-100 text-gray-600'}`}>
+              CP: {isLoadingCP ? '⏳ Loading...' : selectedFiles.cp ? '✓ Loaded' : '○ Not loaded'}
             </div>
-            <div className={`file-status ${selectedFiles.forces ? 'selected' : ''}`}>
-              FORCES: {selectedFiles.forces ? '✓' : '✗'}
+            <div className={`text-xs px-2 py-1 rounded-md font-medium ${selectedFiles.forces ? 'bg-slate-100 text-slate-800' : 'bg-gray-100 text-gray-600'}`}>
+              FORCES: {isLoadingForces ? '⏳ Loading...' : selectedFiles.forces ? '✓ Loaded' : '○ Not loaded'}
             </div>
           </div>
         </div>
 
-        <div className="file-tree">
+        <div className="flex-1 overflow-y-auto p-4">
           {Object.entries(files).map(([fileType, fileList]) => {
-            console.log(`Rendering file type: ${fileType}, files:`, fileList);
-
             if (!Array.isArray(fileList) || fileList.length === 0) {
-              console.log(`Skipping ${fileType} - no files or not array`);
               return null;
             }
 
             return (
-              <div key={fileType} className="file-type-section">
-                <div className="file-type-header">
-                  <span className="file-type-icon">{getFileTypeIcon(fileType)}</span>
-                  <span className="file-type-name">{fileType.toUpperCase()} Files ({fileList.length})</span>
+              <div key={fileType} className="mb-4">
+                <div className="flex items-center mb-2">
+                  <span className="text-lg mr-2">{getFileTypeIcon(fileType)}</span>
+                  <span className="font-medium text-gray-800">{fileType.toUpperCase()} Files ({fileList.length})</span>
                 </div>
-                {fileList.map((file, index) => {
-                  console.log(`Rendering file ${index}:`, file);
-                  return (
-                    <div
-                      key={index}
-                      className={`file-item ${isFileSelected(file) ? 'selected' : ''} ${['dat', 'cp', 'forces'].includes(fileType) ? 'selectable' : 'non-selectable'}`}
-                      onClick={() => handleFileSelect(file)}
-                      title={file.name}
-                    >
-                      <span className="file-icon">
-                        {getFileIcon(file.name)}
-                      </span>
-                      <span className="file-name">{file.name}</span>
-                      {isFileSelected(file) && <span className="selected-indicator">✓</span>}
-                    </div>
-                  );
-                })}
+                <div className="space-y-1">
+                  {fileList.map((file, index) => {
+                    const isLoading = (fileType === 'cp' && isLoadingCP) ||
+                      (fileType === 'forces' && isLoadingForces) ||
+                      (fileType === 'dat' && isLoadingDAT);
+
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center p-2 rounded-lg cursor-pointer transition-all duration-200 ${isFileSelected(file)
+                          ? 'bg-slate-100 border border-slate-300 shadow-sm'
+                          : ['dat', 'cp', 'forces'].includes(fileType)
+                            ? 'hover:bg-gray-50 border border-transparent'
+                            : 'border border-transparent text-gray-500 cursor-default'
+                          } ${isLoading ? 'opacity-60 cursor-wait' : ''}`}
+                        onClick={() => !isLoading && ['dat', 'cp', 'forces'].includes(fileType) && handleFileSelect(file)}
+                        title={file.name}
+                      >
+                        <span className="text-sm mr-2">
+                          {isLoading ? '⏳' : getFileIcon(file.name)}
+                        </span>
+                        <span className="flex-1 text-sm truncate">{file.name}</span>
+                        {isFileSelected(file) && !isLoading && <span className="text-slate-600 text-sm font-medium">✓</span>}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -1586,57 +1034,154 @@ function PostProcessing() {
     }
   };
 
+  // ...existing imports and logic code stays the same...
+
   return (
-    <div className="postprocessing-container">
+    <div className="h-screen w-screen flex flex-col bg-blue-50 font-sans">
       {/* Header */}
-      <div className="postprocessing-header">
-        <div className="header-left">
+      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-blue-200 shadow-sm">
+        <div className="flex items-center space-x-4">
           <button
-            className="toggle-explorer-btn"
+            className="p-2 hover:bg-blue-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
             onClick={() => setIsExplorerOpen(!isExplorerOpen)}
+            title={isExplorerOpen ? 'Hide file explorer' : 'Show file explorer'}
           >
-            {isExplorerOpen ? '◀' : '▶'}
+            <svg className={`w-5 h-5 text-blue-600 transition-transform duration-200 ${isExplorerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
-          <h1>Post-Processing Module</h1>
+          <h1 className="text-xl font-semibold text-gray-800">Post-Processing Module</h1>
         </div>
-        <div className="header-right">
-          <button onClick={handleImportFolder} className="header-btn import-btn">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleImportFolder}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
             Import Folder
           </button>
-          <button onClick={handleNavigateToProWim} className="header-btn prowim-btn">
+          <button
+            onClick={handleNavigateToProWim}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
             ProWiM
           </button>
-          <button onClick={() => navigate('/')} className="header-btn back-btn">
-            Back to Main Module
+          <button
+            onClick={handleContourPlotClick}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Contour Plots
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+          >
+            Back to Main
           </button>
         </div>
       </div>
 
-      <div className="postprocessing-content">
+      <div className="flex flex-1 overflow-hidden">
         {/* File Explorer Sidebar */}
         <div
-          className={`file-explorer ${isExplorerOpen ? 'open' : 'closed'}`}
+          className={`bg-white border-r border-blue-200 transition-all duration-300 ${isExplorerOpen ? 'w-80' : 'w-0'
+            } overflow-hidden relative`}
           style={{ width: isExplorerOpen ? `${explorerWidth}px` : '0px' }}
         >
-          {renderFileExplorer()}
+          {/* File Explorer Content */}
+          {!simulationData ? (
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+              <div className="text-blue-400 mb-4">
+                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="text-gray-600 mb-4">No simulation data loaded</p>
+              <button
+                onClick={handleImportFolder}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Import Folder
+              </button>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col">
+              <div className="p-4 border-b border-blue-200 bg-blue-50">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">{simulationData.simName}</h3>
+                <div className="space-y-1">
+                  <div className={`text-xs px-2 py-1 rounded-md font-medium ${selectedFiles.dat ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                    DAT: {isLoadingDAT ? '⏳ Loading...' : selectedFiles.dat ? '✓ Loaded' : '○ Not loaded'}
+                  </div>
+                  <div className={`text-xs px-2 py-1 rounded-md font-medium ${selectedFiles.cp ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                    CP: {isLoadingCP ? '⏳ Loading...' : selectedFiles.cp ? '✓ Loaded' : '○ Not loaded'}
+                  </div>
+                  <div className={`text-xs px-2 py-1 rounded-md font-medium ${selectedFiles.forces ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}>
+                    FORCES: {isLoadingForces ? '⏳ Loading...' : selectedFiles.forces ? '✓ Loaded' : '○ Not loaded'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                {Object.entries(simulationData.files || {}).map(([fileType, fileList]) => {
+                  if (!Array.isArray(fileList) || fileList.length === 0) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={fileType} className="mb-4">
+                      <div className="flex items-center mb-2">
+                        <span className="text-lg mr-2">{getFileTypeIcon(fileType)}</span>
+                        <span className="font-medium text-gray-800">{fileType.toUpperCase()} Files ({fileList.length})</span>
+                      </div>
+                      <div className="space-y-1">
+                        {fileList.map((file, index) => {
+                          const isLoading = (fileType === 'cp' && isLoadingCP) ||
+                            (fileType === 'forces' && isLoadingForces) ||
+                            (fileType === 'dat' && isLoadingDAT);
+
+                          return (
+                            <div
+                              key={index}
+                              className={`flex items-center p-2 rounded-lg cursor-pointer transition-all duration-200 ${isFileSelected(file)
+                                ? 'bg-blue-100 border border-blue-300 shadow-sm'
+                                : ['dat', 'cp', 'forces'].includes(fileType)
+                                  ? 'hover:bg-blue-50 border border-transparent'
+                                  : 'border border-transparent text-gray-500 cursor-default'
+                                } ${isLoading ? 'opacity-60 cursor-wait' : ''}`}
+                              onClick={() => !isLoading && ['dat', 'cp', 'forces'].includes(fileType) && handleFileSelect(file)}
+                              title={file.name}
+                            >
+                              <span className="text-sm mr-2">
+                                {isLoading ? '⏳' : getFileIcon(file.name)}
+                              </span>
+                              <span className="flex-1 text-sm truncate">{file.name}</span>
+                              {isFileSelected(file) && !isLoading && <span className="text-blue-600 text-sm font-medium">✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Resize Handle */}
           {isExplorerOpen && (
             <div
               ref={resizeRef}
-              className={`resize-handle ${isResizing ? 'resizing' : ''}`}
+              className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 transition-colors duration-200 ${isResizing ? 'bg-blue-400' : 'bg-blue-200'
+                }`}
               onMouseDown={handleMouseDown}
-            >
-              <div className="resize-line"></div>
-            </div>
+            />
           )}
         </div>
 
         {/* Main Content Area */}
-        <div className="main-content">
+        <div className="flex-1 flex flex-col">
           {/* Show mesh plot spanning both areas when mesh is active */}
           {showMesh && meshData ? (
-            <div className="mesh-container">
+            <div className="flex-1 bg-white">
               <Plot
                 data={meshData.data}
                 layout={meshData.layout}
@@ -1646,8 +1191,8 @@ function PostProcessing() {
               />
             </div>
           ) : showSpanwiseDistribution && spanwiseData ? (
-            <>
-              <div className="spanwise-container">
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 bg-white">
                 <Plot
                   data={spanwiseData.data}
                   layout={spanwiseData.layout}
@@ -1656,8 +1201,7 @@ function PostProcessing() {
                   useResizeHandler={true}
                 />
               </div>
-              {/* Bottom Canvas Area - Plot 2 */}
-              <div className="canvas-container bottom-canvas">
+              <div className="flex-1 bg-white border-t border-blue-200">
                 {plotData2 ? (
                   <Plot
                     data={plotData2.data}
@@ -1667,15 +1211,15 @@ function PostProcessing() {
                     useResizeHandler={true}
                   />
                 ) : (
-                  <div className="blank-plot-area"></div>
+                  <div className="h-full bg-blue-50 flex items-center justify-center">
+                    <p className="text-gray-500">No plot data available</p>
+                  </div>
                 )}
               </div>
-
-            </>
+            </div>
           ) : (
-            <>
-              {/* Top Canvas Area - Plot 1 */}
-              <div className="canvas-container top-canvas">
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 bg-white">
                 {plotData1 ? (
                   <Plot
                     data={plotData1.data}
@@ -1685,12 +1229,19 @@ function PostProcessing() {
                     useResizeHandler={true}
                   />
                 ) : (
-                  <div className="blank-plot-area"></div>
+                  <div className="h-full bg-blue-50 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-blue-400 mb-3">
+                        <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-500 font-medium">Select files and configure options to display plots</p>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              {/* Bottom Canvas Area - Plot 2 */}
-              <div className="canvas-container bottom-canvas">
+              <div className="flex-1 bg-white border-t border-blue-200">
                 {plotData2 ? (
                   <Plot
                     data={plotData2.data}
@@ -1700,116 +1251,162 @@ function PostProcessing() {
                     useResizeHandler={true}
                   />
                 ) : (
-                  <div className="blank-plot-area"></div>
+                  <div className="h-full bg-blue-50 flex items-center justify-center">
+                    <p className="text-gray-500">No plot data available</p>
+                  </div>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
 
-
         {/* Right Sidebar */}
-        <div className="right-sidebar">
+        <div className="w-80 bg-white border-l border-blue-200 flex flex-col overflow-y-auto">
           {/* Controls Section */}
-          <div className="control-section">
-            <button
-              className={`control-btn mesh-btn ${showMesh ? 'active' : ''}`}
-              onClick={handleMeshClick}
-            >
-              {showMesh ? 'Hide Mesh' : 'Mesh'}
-            </button>
-            <button className="control-btn boundary-btn" onClick={handleBoundaryLayerClick}>Boundary Layer Data</button>
-
-            <div className="dropdown-section">
-              {/* Level Selection */}
-              <select
-                className="control-dropdown"
-                value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
-              >
-                <option value="">Select Level</option>
-                {levels.map(level => (
-                  <option key={level.value} value={level.value}>
-                    {level.label}
-                  </option>
-                ))}
-              </select>
-
-              {/* Plot Type Selection */}
-              <select
-                className="control-dropdown"
-                value={selectedPlotType}
-                onChange={(e) => setSelectedPlotType(e.target.value)}
-                disabled={showMesh || showSpanwiseDistribution}
-              >
-                <option value="Mach">Mach</option>
-                <option value="Cp">Cp</option>
-              </select>
-
-              {/* Section Selection */}
-              <select
-                className="control-dropdown"
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                disabled={showMesh}
-              >
-                <option value="">Select Section</option>
-                {sections.map(section => (
-                  <option key={section.value} value={section.value}>
-                    {section.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="spanwise-section">
+          <div className="p-4 border-b border-blue-200 bg-blue-50">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Analysis Tools</h3>
+            <div className="space-y-3">
               <button
-                className={`control-btn spanwise-btn ${showSpanwiseDistribution ? 'active' : ''}`}
+                className={`w-full px-4 py-2.5 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${showMesh
+                  ? 'bg-blue-600 text-white shadow-sm focus:ring-blue-500'
+                  : 'bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 focus:ring-blue-300'
+                  }`}
+                onClick={handleMeshClick}
+              >
+                {showMesh ? 'Hide Mesh' : 'Show Mesh'}
+              </button>
+
+              <button
+                className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                onClick={handleBoundaryLayerClick}
+              >
+                Boundary Layer Data
+              </button>
+
+              <button
+                className={`w-full px-4 py-2.5 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${showSpanwiseDistribution
+                  ? 'bg-blue-600 text-white shadow-sm focus:ring-blue-500'
+                  : 'bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 focus:ring-blue-300'
+                  }`}
                 onClick={handleSpanwiseDistributionClick}
               >
                 {showSpanwiseDistribution ? 'Hide Spanwise' : 'Spanwise Distribution'}
               </button>
+            </div>
+          </div>
 
-              <select className="control-dropdown" value={selectedSpanwiseCoeff} onChange={(e) => setSelectedSpanwiseCoeff(e.target.value)} disabled={!showSpanwiseDistribution}>
-                <option>Load</option>
-                <option>CL</option>
-                <option>CD</option>
-                <option>CM</option>
-              </select>
+          {/* Configuration Section */}
+          <div className="p-4 border-b border-blue-200">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Configuration</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
+                <select
+                  className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  value={selectedLevel}
+                  onChange={(e) => setSelectedLevel(e.target.value)}
+                >
+                  <option value="">Select Level</option>
+                  {levels.map(level => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plot Type</label>
+                <select
+                  className={`w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 ${showMesh || showSpanwiseDistribution ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  value={selectedPlotType}
+                  onChange={(e) => setSelectedPlotType(e.target.value)}
+                  disabled={showMesh || showSpanwiseDistribution}
+                >
+                  <option value="Mach">Mach</option>
+                  <option value="Cp">Cp</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
+                <select
+                  className={`w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 ${showMesh ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  value={selectedSection}
+                  onChange={(e) => setSelectedSection(e.target.value)}
+                  disabled={showMesh}
+                >
+                  <option value="">Select Section</option>
+                  {sections.map(section => (
+                    <option key={section.value} value={section.value}>
+                      {section.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {showSpanwiseDistribution && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Coefficient</label>
+                  <select
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                    value={selectedSpanwiseCoeff}
+                    onChange={(e) => setSelectedSpanwiseCoeff(e.target.value)}
+                  >
+                    <option value="CL">CL</option>
+                    <option value="CD">CD</option>
+                    <option value="CM">CM</option>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Coefficients Section */}
-          <div className="coefficients-section">
-            <h3>Coefficients</h3>
-            <div className="coeff-table">
-              <div className="coeff-row">
-                <span className="coeff-label">CL</span>
-                <span className="coeff-value">{coefficients.CL?.toFixed(6) || 'N/A'}</span>
+          <div className="p-4 flex-1">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Aerodynamic Coefficients</h3>
+            <div className="space-y-3 mb-6">
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700">CL</span>
+                  <span className="font-mono text-gray-900 text-sm">{coefficients.CL?.toFixed(6) || 'N/A'}</span>
+                </div>
               </div>
-              <div className="coeff-row">
-                <span className="coeff-label">CD</span>
-                <span className="coeff-value">{coefficients.CD?.toFixed(6) || 'N/A'}</span>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700">CD</span>
+                  <span className="font-mono text-gray-900 text-sm">{coefficients.CD?.toFixed(6) || 'N/A'}</span>
+                </div>
               </div>
-              <div className="coeff-row">
-                <span className="coeff-label">CM</span>
-                <span className="coeff-value">{coefficients.CM?.toFixed(6) || 'N/A'}</span>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700">CM</span>
+                  <span className="font-mono text-gray-900 text-sm">{coefficients.CM?.toFixed(6) || 'N/A'}</span>
+                </div>
               </div>
             </div>
 
-            <h4>Drag Coefficients Breakdown:</h4>
-            <div className="drag-table">
-              <div className="drag-row">
-                <span className="drag-label">CD Induced</span>
-                <span className="drag-value">{dragBreakdown.cdInduced?.toFixed(6) || '0.000'}</span>
+            <h4 className="text-md font-semibold text-gray-800 mb-3">Drag Breakdown</h4>
+            <div className="space-y-2">
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700 text-sm">CD Induced</span>
+                  <span className="font-mono text-gray-900 text-xs">{dragBreakdown.cdInduced?.toFixed(6) || '0.000000'}</span>
+                </div>
               </div>
-              <div className="drag-row">
-                <span className="drag-label">CD Viscous</span>
-                <span className="drag-value">{dragBreakdown.cdViscous?.toFixed(6) || '0.000'}</span>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700 text-sm">CD Viscous</span>
+                  <span className="font-mono text-gray-900 text-xs">{dragBreakdown.cdViscous?.toFixed(6) || '0.000000'}</span>
+                </div>
               </div>
-              <div className="drag-row">
-                <span className="drag-label">CD wave</span>
-                <span className="drag-value">{dragBreakdown.cdWave?.toFixed(6) || 'NaN'}</span>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700 text-sm">CD Wave</span>
+                  <span className="font-mono text-gray-900 text-xs">{dragBreakdown.cdWave?.toFixed(6) || 'N/A'}</span>
+                </div>
               </div>
             </div>
           </div>

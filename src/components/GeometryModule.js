@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import Plot3D from './Plot3D';
 import Plot2D from './Plot2D';
-import "./GeometryModule.css";
 import { useNavigate } from "react-router-dom";
 import { fetchAPI } from '../utils/fetch';
-import { reverse } from 'd3';
-import { AArrowDown } from 'lucide-react';
 
 function GeometryModule() {
   const [geoFiles, setGeoFiles] = useState([]); // Array to store multiple GEO files
@@ -245,10 +242,10 @@ function GeometryModule() {
     setSelected2DPlot("");
     setModifiedParameters({}); // Clear modified parameters when switching sections
 
-    // Reset planform view when not in 3D Wing mode
-    if (sectionIndex !== -1) {
-      setPlanformView(false);
-    }
+    // // Reset planform view when not in 3D Wing mode
+    // if (sectionIndex !== -1) {
+    //   setPlanformView(false);
+    // }
 
     // Update the selected section for the current file
     if (selectedGeoFile) {
@@ -262,9 +259,7 @@ function GeometryModule() {
   };
 
   const handlePlanformToggle = () => {
-    if (selectedSection === -1) { // Only allow when 3D Wing is selected
-      setPlanformView(!planformView);
-    }
+    setPlanformView(!planformView);
   };
 
   const updateParameters = (sectionIndex) => {
@@ -506,7 +501,7 @@ function GeometryModule() {
     const plotData = selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData;
     const color = selectedGeoFile.color;
 
-    if (planformView && selectedSection === -1) {
+    if (planformView) {
       // Generate planform view traces (top-down 2D view)
       const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
       return geoData.map((section, index) => ({
@@ -545,7 +540,7 @@ function GeometryModule() {
 
   // Get plot layout for 3D view
   const get3DPlotLayout = () => {
-    if (planformView && selectedSection === -1) {
+    if (planformView) {
       // 2D planform view layout
       return {
         xaxis: {
@@ -585,7 +580,6 @@ function GeometryModule() {
       };
     }
   };
-
 
   // 2D plot traces (for all visible files)
   const plot2DTrace = () => {
@@ -723,337 +717,456 @@ function GeometryModule() {
   };
 
   return (
-    <div className="app">
-      <header className="header">
-        <div className="header-group">
-          <button className="btn btn-primary" onClick={() => navigate('/')}>Back to Main Module</button>
-          <button className="btn btn-secondary">FPCON</button>
-          <div className='btn btn-secondary'>
-            <input
-              type="file"
-              accept=".GEO"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-              id="fileInput"
-              multiple
-            />
-            <label onClick={() => document.getElementById('fileInput').click()}>
-              Import file
-            </label>
+    <div className="min-h-screen bg-gray-100 font-serif">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="px-8 py-4 flex justify-between items-center flex-wrap gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <button
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+              onClick={() => navigate('/')}
+            >
+              Back to Main Module
+            </button>
+            <button className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md">
+              FPCON
+            </button>
+            <div className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md cursor-pointer">
+              <input
+                type="file"
+                accept=".GEO"
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+                id="fileInput"
+                multiple
+              />
+              <label
+                className="cursor-pointer"
+                onClick={() => document.getElementById('fileInput').click()}
+              >
+                Import file
+              </label>
+            </div>
           </div>
-        </div>
-        <div className="header-group">
-          <button className="btn btn-secondary" onClick={exportGeoFile}>Export GEO file</button>
-          <button className="btn btn-secondary">Save plots</button>
-          <button className="btn btn-danger" onClick={() => window.location.reload(false)}>Reset</button>
+          <div className="flex items-center gap-4 flex-wrap">
+            <button
+              className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md"
+              onClick={exportGeoFile}
+            >
+              Export GEO file
+            </button>
+            <button className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md">
+              Save plots
+            </button>
+            <button
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+              onClick={() => window.location.reload(false)}
+            >
+              Reset
+            </button>
+          </div>
         </div>
       </header>
 
-      <div className="content-row">
-        {/* Main Content: vertical stack */}
-        <div className="main-content">
-          <div className="graph-panel">
-            {/* GEO File Selection for 3D Plot */}
-            {geoFiles.length > 0 && (
-              <div className="dropdown-container">
-                <label htmlFor="geo-file-select">3D Plot File: </label>
-                <select
-                  id="geo-file-select"
-                  onChange={handleGeoFileSelection}
-                  value={selectedGeoFile?.id || ''}
-                >
-                  {geoFiles.map((file) => (
-                    <option key={file.id} value={file.id}>
-                      {file.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+      {/* Main Content */}
+      <div className="flex lg:flex-row flex-col gap-4 p-4 min-h-screen">
+        {/* Left Side - Main Content */}
+        <div className="flex-1 lg:w-3/4 space-y-4">
+          {/* Combined Controls Panel - All in one horizontal line */}
+          {geoFiles.length > 0 && (
+            <div className="bg-white rounded-xl shadow-md p-3">
+              <div className="flex flex-wrap items-center gap-6">
+                {/* 3D Plot File Selection */}
+                <div className="flex items-center gap-3">
+                  <label htmlFor="geo-file-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
+                    3D Plot File:
+                  </label>
+                  <select
+                    id="geo-file-select"
+                    onChange={handleGeoFileSelection}
+                    value={selectedGeoFile?.id || ''}
+                    className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                  >
+                    {geoFiles.map((file) => (
+                      <option key={file.id} value={file.id}>
+                        {file.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Section Selection with Planform View Toggle */}
-            {sections.length > 0 && (
-              <div className="dropdown-container">
-                <label htmlFor="section-select">Section: </label>
-                <select id="section-select" onChange={handleSectionChange}
-                  value={selectedSection}>
-                  {sections.map((section, index) => (
-                    <option key={index} value={index - 1}>
-                      {section}
-                    </option>
-                  ))}
-                </select>
+                {/* Section Selection */}
+                {sections.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <label htmlFor="section-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
+                      Section:
+                    </label>
+                    <select
+                      id="section-select"
+                      onChange={handleSectionChange}
+                      value={selectedSection}
+                      className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                    >
+                      {sections.map((section, index) => (
+                        <option key={index} value={index - 1}>
+                          {section}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Planform View Toggle */}
-                <div className="planform-toggle">
-                  <label className="toggle-label">
-                    <input
-                      type="checkbox"
-                      checked={planformView}
-                      onChange={handlePlanformToggle}
-                      disabled={selectedSection !== -1}
-                      className="toggle-checkbox"
-                    />
-                    <span className="toggle-slider"></span>
-                    <span className="toggle-text">Planform View</span>
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3D Plot */}
-          {selectedGeoFile && (
-            <Plot3D
-              plotData={plot3DTrace()}
-              selectedSection={selectedSection}
-              layout={get3DPlotLayout()}
-            />
-          )}
-
-          <div className="plot2d-panel">
-            {/* 2D File Visibility Controls */}
-            {geoFiles.length > 0 && (
-              <div className="file-visibility-container">
-                <label>2D Plot Files: </label>
-                <div className="checkbox-group">
-                  {geoFiles.map(file => (
-                    <label key={file.id} className="checkbox-label">
+                {sections.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={visible2DFiles.includes(file.id)}
-                        onChange={() => handle2DVisibilityToggle(file.id)}
+                        checked={planformView}
+                        onChange={handlePlanformToggle}
+                        className="sr-only"
                       />
-                      <span style={{ color: file.color.primary }}>
-                        {file.name}
-                        {file.selectedSection >= 0 && ` (Section ${file.selectedSection + 1})`}
+                      <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'
+                        } ${selectedSection !== -1 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-5' : ''
+                          }`} />
+                      </div>
+                      <span className={`ml-2 text-sm font-medium ${selectedSection !== -1 ? 'text-gray-400' : 'text-gray-700'} whitespace-nowrap`}>
+                        Planform View
                       </span>
                     </label>
-                  ))}
+                  </div>
+                )}
+
+                {/* Vertical Separator */}
+                <div className="h-6 w-px bg-gray-300"></div>
+
+                {/* 2D Plot File Visibility Controls */}
+                <div className="flex items-center gap-3">
+                  <label className="font-medium text-gray-700 text-sm whitespace-nowrap">2D Plot Files:</label>
+                  <div className="flex flex-wrap gap-3">
+                    {geoFiles.map(file => (
+                      <label key={file.id} className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={visible2DFiles.includes(file.id)}
+                          onChange={() => handle2DVisibilityToggle(file.id)}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: file.color.primary }}
+                        >
+                          {file.name}
+                          {file.selectedSection >= 0 && ` (S${file.selectedSection + 1})`}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Another Vertical Separator */}
+                <div className="h-6 w-px bg-gray-300"></div>
+
+                {/* 2D Plot Type Selection */}
+                <div className="flex items-center gap-3">
+                  <label className="font-medium text-gray-700 text-sm whitespace-nowrap">Plot Type:</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="plot2d"
+                        value="section"
+                        checked={selected2DPlot === "section"}
+                        onChange={() => setSelected2DPlot("section")}
+                        disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
+                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                      />
+                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Section 2D</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="plot2d"
+                        value="twist"
+                        checked={selected2DPlot === "twist"}
+                        onChange={() => setSelected2DPlot("twist")}
+                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                      />
+                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Twist</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="plot2d"
+                        value="dihedral"
+                        checked={selected2DPlot === "dihedral"}
+                        onChange={() => setSelected2DPlot("dihedral")}
+                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                      />
+                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Dihedral</span>
+                    </label>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* 2D Plot Type Selection */}
-            <div className="plot2d-radio-group">
-              <label>
-                <input
-                  type="radio"
-                  name="plot2d"
-                  value="section"
-                  checked={selected2DPlot === "section"}
-                  onChange={() => setSelected2DPlot("section")}
-                  disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
-                />
-                Section 2D Plot
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="plot2d"
-                  value="twist"
-                  checked={selected2DPlot === "twist"}
-                  onChange={() => setSelected2DPlot("twist")}
-                />
-                Twist Distribution
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="plot2d"
-                  value="dihedral"
-                  checked={selected2DPlot === "dihedral"}
-                  onChange={() => setSelected2DPlot("dihedral")}
-                />
-                Dihedral Distribution
-              </label>
             </div>
-          </div>
+          )}
+          {/* 3D Plot */}
+          {selectedGeoFile && (
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <Plot3D
+                plotData={plot3DTrace()}
+                selectedSection={selectedSection}
+                layout={get3DPlotLayout()}
+              />
+            </div>
+          )}
 
           {/* 2D Plot */}
           {geoFiles.length > 0 && visible2DFiles.length > 0 && (
-            <Plot2D
-              plotData={plot2DTrace()}
-              selectedSection={selectedSection}
-            />
+            <div className="bg-white rounded-xl shadow-md p-4">
+              <Plot2D
+                plotData={plot2DTrace()}
+                selectedSection={selectedSection}
+              />
+            </div>
           )}
         </div>
 
-        {/* Side Content: vertical stack */}
-        <div className="side-content">
-          <div className="side-panel">
-            <div className="specs-panel">
-              <div className="specs-container">
-                <h2 className="specs-title">Wing Specifications</h2>
-                <table className="specs-table">
-                  <tbody>
-                    <tr>
-                      <td>Aspect Ratio</td>
-                      <td><input type="text" className="input-field" value={wingSpecs.aspectRatio} readOnly /></td>
-                    </tr>
-                    <tr>
-                      <td>Wing Span</td>
-                      <td><input type="text" className="input-field" value={wingSpecs.wingSpan} readOnly /></td>
-                    </tr>
-                    <tr>
-                      <td>Number of Sections</td>
-                      <td><input type="text" className="input-field" value={wingSpecs.numSections} readOnly /></td>
-                    </tr>
-                    <tr>
-                      <td>Taper Ratio</td>
-                      <td><input type="text" className="input-field" value={wingSpecs.taperRatio} readOnly /></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Improve Sections Panel */}
-            <div className="improve-panel">
-              <div className="improve-container">
-                <h2 className="improve-title">Improve Sections</h2>
-
-                {/* Parameter Selection */}
-                <div className="improve-radio-group">
-                  <label>
-                    <input
-                      type="radio"
-                      name="improveParameter"
-                      value="Twist"
-                      checked={improveSettings.selectedParameter === 'Twist'}
-                      onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
-                    />
-                    Twist
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="improveParameter"
-                      value="Dihedral"
-                      checked={improveSettings.selectedParameter === 'Dihedral'}
-                      onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
-                    />
-                    Dihedral
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="improveParameter"
-                      value="XLE"
-                      checked={improveSettings.selectedParameter === 'XLE'}
-                      onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
-                    />
-                    XLE
-                  </label>
+        {/* Right Side - Control Panels (Reduced Width) */}
+        <div className="lg:w-1/4 space-y-4">
+          {/* Wing Specifications Panel */}
+          <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+            <div className="p-4">
+              <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
+                Wing Specifications
+              </h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="text-xs font-medium text-gray-600">Aspect Ratio</label>
+                  <input
+                    type="text"
+                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={wingSpecs.aspectRatio}
+                    readOnly
+                  />
                 </div>
-
-                {/* Section Range Selection */}
-                <div className="improve-sections">
-                  <div className="section-range">
-                    <label>Sections:</label>
-                    <div className="range-inputs">
-                      <select
-                        value={improveSettings.startSection}
-                        onChange={(e) => handleImproveSettingsChange('startSection', parseInt(e.target.value))}
-                        disabled={!selectedGeoFile}
-                      >
-                        {getSectionOptions().map(sectionNum => (
-                          <option key={sectionNum} value={sectionNum}>
-                            {sectionNum}
-                          </option>
-                        ))}
-                      </select>
-
-                      <span>to</span>
-
-                      <select
-                        value={improveSettings.endSection}
-                        onChange={(e) => handleImproveSettingsChange('endSection', parseInt(e.target.value))}
-                        disabled={!selectedGeoFile}
-                      >
-                        {getSectionOptions().map(sectionNum => (
-                          <option key={sectionNum} value={sectionNum}>
-                            {sectionNum}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Formula Display */}
-                  <div className="formula-display">
-                    <span>(y = ax² + bx + c)</span>
-                  </div>
-
-                  {/* A Value Input */}
-                  <div className="a-value">
-                    <label>a = </label>
-                    <input
-                      type="number"
-                      className="input-field"
-                      value={improveSettings.aValue}
-                      onChange={(e) => handleImproveSettingsChange('aValue', e.target.value)}
-                      step="0.5"
-                      placeholder='0.0'
-                    />
-                  </div>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="text-xs font-medium text-gray-600">Wing Span</label>
+                  <input
+                    type="text"
+                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={wingSpecs.wingSpan}
+                    readOnly
+                  />
                 </div>
-
-                {/* Improve and Reset Controls */}
-                <div className="improve-controls">
-                  <button
-                    className="btn btn-primary"
-                    onClick={performInterpolation}
-                    disabled={!selectedGeoFile}
-                  >
-                    Improve
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={resetImproveChanges}
-                    disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
-                  >
-                    Reset
-                  </button>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="text-xs font-medium text-gray-600">Number of Sections</label>
+                  <input
+                    type="text"
+                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={wingSpecs.numSections}
+                    readOnly
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="text-xs font-medium text-gray-600">Taper Ratio</label>
+                  <input
+                    type="text"
+                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={wingSpecs.taperRatio}
+                    readOnly
+                  />
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="controls-panel">
-              <div className="controls-container">
-                <h2 className="controls-title">Controls</h2>
-                {/* Selection Info Header */}
-                <div className="selection-info">
-                  <h3 className="selection-header">{getSelectionInfo()}</h3>
+          {/* Improve Sections Panel */}
+          <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+            <div className="p-4">
+              <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
+                Improve Sections
+              </h2>
+
+              {/* Parameter Selection */}
+              <div className="mb-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-2">
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        name="improveParameter"
+                        value="Twist"
+                        checked={improveSettings.selectedParameter === 'Twist'}
+                        onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
+                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                      />
+                      <span className="ml-2 text-sm font-medium text-gray-700">Twist</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        name="improveParameter"
+                        value="Dihedral"
+                        checked={improveSettings.selectedParameter === 'Dihedral'}
+                        onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
+                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                      />
+                      <span className="ml-2 text-sm font-medium text-gray-700">Dihedral</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        name="improveParameter"
+                        value="XLE"
+                        checked={improveSettings.selectedParameter === 'XLE'}
+                        onChange={(e) => handleImproveSettingsChange('selectedParameter', e.target.value)}
+                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                      />
+                      <span className="ml-2 text-sm font-medium text-gray-700">XLE</span>
+                    </label>
+                  </div>
                 </div>
-                <table className="parameters-table">
+              </div>
+
+              {/* Section Range Selection */}
+              <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sections:</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={improveSettings.startSection}
+                      onChange={(e) => handleImproveSettingsChange('startSection', parseInt(e.target.value))}
+                      disabled={!selectedGeoFile}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
+                    >
+                      {getSectionOptions().map(sectionNum => (
+                        <option key={sectionNum} value={sectionNum}>
+                          {sectionNum}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs font-medium text-gray-600">to</span>
+                    <select
+                      value={improveSettings.endSection}
+                      onChange={(e) => handleImproveSettingsChange('endSection', parseInt(e.target.value))}
+                      disabled={!selectedGeoFile}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
+                    >
+                      {getSectionOptions().map(sectionNum => (
+                        <option key={sectionNum} value={sectionNum}>
+                          {sectionNum}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Formula Display */}
+                <div className="text-center mb-3 p-2 bg-gray-50 border border-gray-200 rounded-md">
+                  <span className="font-mono text-xs text-gray-600 font-medium">(y = ax² + bx + c)</span>
+                </div>
+
+                {/* A Value Input */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">a =</label>
+                  <input
+                    type="number"
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={improveSettings.aValue}
+                    onChange={(e) => handleImproveSettingsChange('aValue', e.target.value)}
+                    step="0.5"
+                    placeholder='0.0'
+                  />
+                </div>
+              </div>
+
+              {/* Improve and Reset Controls */}
+              <div className="flex justify-center gap-2">
+                <button
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  onClick={performInterpolation}
+                  disabled={!selectedGeoFile}
+                >
+                  Improve
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  onClick={resetImproveChanges}
+                  disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Controls Panel */}
+          <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+            <div className="p-4">
+              <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
+                Controls
+              </h2>
+
+              {/* Selection Info Header */}
+              <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-600 rounded-md">
+                <h3 className="text-sm font-semibold text-blue-700 text-center">
+                  {getSelectionInfo()}
+                </h3>
+              </div>
+
+              {/* Parameters Table */}
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full">
                   <thead>
-                    <tr>
-                      <th className="text-left">Parameter</th>
-                      <th>Baseline</th>
-                      <th>Modified</th>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-1 px-1 text-xs font-medium text-gray-700">Parameter</th>
+                      <th className="text-center py-1 px-1 text-xs font-medium text-gray-700">Baseline</th>
+                      <th className="text-center py-1 px-1 text-xs font-medium text-gray-700">Modified</th>
                     </tr>
                   </thead>
                   <tbody>
                     {Object.entries(parameters || { Twist: 0.0, Dihedral: 0.0, YSECT: 0.0, XLE: 0.0, XTE: 0.0, Chord: 0.0 }).map(([key, value]) => (
-                      <tr key={key}>
-                        <td>{key}</td>
-                        <td><input type="text" className="input-field" value={typeof value === "number" ? Number(value).toFixed(3) : value} readOnly /></td>
-                        <td><input type="text" className="input-field" onChange={(e) => handleParameterChange(key, e.target.value)} value={modifiedParameters[key] ?? ''} /></td>
+                      <tr key={key} className="border-b border-gray-100">
+                        <td className="py-1 px-1 text-xs font-medium text-gray-700">{key}</td>
+                        <td className="py-1 px-1">
+                          <input
+                            type="text"
+                            className="w-full px-1 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none"
+                            value={typeof value === "number" ? Number(value).toFixed(3) : value}
+                            readOnly
+                          />
+                        </td>
+                        <td className="py-1 px-1">
+                          <input
+                            type="text"
+                            className="w-full px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onChange={(e) => handleParameterChange(key, e.target.value)}
+                            value={modifiedParameters[key] ?? ''}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="computation-controls">
-                  <button className="btn btn-primary" onClick={computeDesired}>Compute Desired</button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={resetAllChanges}
-                    disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
-                  >
-                    Reset
-                  </button>
-                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-center gap-2">
+                <button
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                  onClick={computeDesired}
+                >
+                  Compute Desired
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  onClick={resetAllChanges}
+                  disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
+                >
+                  Reset
+                </button>
               </div>
             </div>
           </div>

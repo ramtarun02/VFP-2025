@@ -3,8 +3,7 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from flask_socketio import SocketIO, emit
 import os
-import shutil
-import signal
+import traceback
 import subprocess
 import tempfile
 import runVFP as run
@@ -16,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import threading
 import time
+from readVFP import readCP, readFORCE, readFLOW
 
 current_process = None
 app = Flask(__name__)
@@ -1063,6 +1063,183 @@ def export_geo():
     except Exception as e:
         print(f"Error in export_geo endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/parse_cp', methods=['POST'])
+def parse_cp():
+    """
+    Parse CP file content using readVFP.readCP function
+    Expects JSON with: fileName, content, simName
+    Returns: Parsed CP data as JSON
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        file_name = data.get('fileName')
+        file_content = data.get('content')
+        sim_name = data.get('simName', 'unknown')
+        
+        if not file_name or not file_content:
+            return jsonify({'error': 'fileName and content are required'}), 400
+        
+        print(f"Parsing CP file: {file_name} for simulation: {sim_name}")
+        
+        # Create a temporary file to use with readCP function
+        temp_file_path = f"temp_{sim_name}_{file_name}"
+        
+        try:
+            # Write content to temporary file
+            with open(temp_file_path, 'w', encoding='utf-8') as temp_file:
+                temp_file.write(file_content)
+            
+            # Use readCP function to parse the file
+            parsed_data = readCP(temp_file_path)
+            
+            # Clean up temporary file
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            
+            if parsed_data is None:
+                return jsonify({'error': 'Failed to parse CP file - readCP returned None'}), 500
+            
+            print(f"Successfully parsed CP file: {file_name}")
+            
+            # Return the parsed data directly as JSON
+            return jsonify(parsed_data), 200
+            
+        except Exception as file_error:
+            # Clean up temporary file on error
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            raise file_error
+            
+    except Exception as e:
+        print(f"Error parsing CP file: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': f'Error parsing CP file: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/parse_forces', methods=['POST'])
+def parse_forces():
+    """
+    Parse Forces file content using readVFP.readFORCE function
+    Expects JSON with: fileName, content, simName
+    Returns: Parsed Forces data as JSON
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        file_name = data.get('fileName')
+        file_content = data.get('content')
+        sim_name = data.get('simName', 'unknown')
+        
+        if not file_name or not file_content:
+            return jsonify({'error': 'fileName and content are required'}), 400
+        
+        print(f"Parsing Forces file: {file_name} for simulation: {sim_name}")
+        
+        # Create a temporary file to use with readFORCE function
+        temp_file_path = f"temp_{sim_name}_{file_name}"
+        
+        try:
+            # Write content to temporary file
+            with open(temp_file_path, 'w', encoding='utf-8') as temp_file:
+                temp_file.write(file_content)
+            
+            # Use readFORCE function to parse the file
+            parsed_data = readFORCE(temp_file_path)
+            
+            # Clean up temporary file
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            
+            if parsed_data is None:
+                return jsonify({'error': 'Failed to parse Forces file - readFORCE returned None'}), 500
+            
+            print(f"Successfully parsed Forces file: {file_name}")
+            
+            # Return the parsed data directly as JSON
+            return jsonify(parsed_data), 200
+            
+        except Exception as file_error:
+            # Clean up temporary file on error
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            raise file_error
+            
+    except Exception as e:
+        print(f"Error parsing Forces file: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': f'Error parsing Forces file: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/parse_dat', methods=['POST'])
+def parse_dat():
+    """
+    Parse DAT file content using readVFP.readDAT function
+    Expects JSON with: fileName, content, simName
+    Returns: Parsed DAT data as JSON
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        file_name = data.get('fileName')
+        file_content = data.get('content')
+        sim_name = data.get('simName', 'unknown')
+        
+        if not file_name or not file_content:
+            return jsonify({'error': 'fileName and content are required'}), 400
+        
+        print(f"Parsing DAT file: {file_name} for simulation: {sim_name}")
+        
+        # Create a temporary file to use with readDAT function
+        temp_file_path = f"temp_{sim_name}_{file_name}"
+        
+        try:
+            # Write content to temporary file
+            with open(temp_file_path, 'w', encoding='utf-8') as temp_file:
+                temp_file.write(file_content)
+            
+            # Use readDAT function to parse the file
+            parsed_data = readFLOW(temp_file_path)
+            
+            # Clean up temporary file
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            
+            if parsed_data is None:
+                return jsonify({'error': 'Failed to parse DAT file - readDAT returned None'}), 500
+            
+            print(f"Successfully parsed DAT file: {file_name}")
+            
+            # Return the parsed data directly as JSON
+            return jsonify(parsed_data), 200
+            
+        except Exception as file_error:
+            # Clean up temporary file on error
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            raise file_error
+            
+    except Exception as e:
+        print(f"Error parsing DAT file: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': f'Error parsing DAT file: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
 
 if __name__ == '__main__':
     if os.environ.get('FLASK_ENV') == 'production':
