@@ -10,25 +10,29 @@ import { FormDataProvider } from "./components/FormDataContext";
 import SimulationRun from "./components/SimulationRun";
 import BoundaryLayer from "./components/BoundaryLayerData";
 import ContourPlot from "./components/ContourPlot";
+import { SimulationDataProvider } from "./components/SimulationDataContext";
+
 
 
 
 function App() {
   return (
     <FormDataProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/geometry" element={<GeometryModule />} />
-          <Route path="/run-solver" element={<RunSolver />} />
-          <Route path="/results" element={<Solver />} />
-          <Route path="/post-processing" element={<PostProcessing />} />
-          <Route path="/post-processing/prowim" element={<ProWiM />} />
-          <Route path="/post-processing/contour-plot" element={<ContourPlot />} />
-          <Route path="/post-processing/boundary-layer" element={<BoundaryLayer />} />
-          <Route path="/simulation-run" element={<SimulationRun />} />
-        </Routes>
-      </Router>
+      <SimulationDataProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/geometry" element={<GeometryModule />} />
+            <Route path="/run-solver" element={<RunSolver />} />
+            <Route path="/results" element={<Solver />} />
+            <Route path="/post-processing" element={<PostProcessing />} />
+            <Route path="/post-processing/prowim" element={<ProWiM />} />
+            <Route path="/post-processing/contour-plot" element={<ContourPlot />} />
+            <Route path="/post-processing/boundary-layer" element={<BoundaryLayer />} />
+            <Route path="/simulation-run" element={<SimulationRun />} />
+          </Routes>
+        </Router>
+      </SimulationDataProvider>
     </FormDataProvider>
   );
 }

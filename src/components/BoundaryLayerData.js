@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Plot from 'react-plotly.js';
 import { fetchAPI } from '../utils/fetch';
+import { useSimulationData } from "../components/SimulationDataContext"; // Import context
 
 function BoundaryLayer() {
+    // --- Routing and Context ---
     const navigate = useNavigate();
     const location = useLocation();
+    const { simulationData } = useSimulationData(); // Use simulationData from context
+
+    // --- Local State ---
     const [visData, setVisData] = useState(null);
     const [sections, setSections] = useState([]);
     const [selectedSection, setSelectedSection] = useState('');
@@ -21,11 +26,10 @@ function BoundaryLayer() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Add new state for available .vis files from simulation folder
-    const [simulationData, setSimulationData] = useState(null);
+    // --- Available .vis files from simulation folder ---
     const [availableVisFiles, setAvailableVisFiles] = useState([]);
 
-    // BL Velocity Profile states
+    // --- BL Velocity Profile states ---
     const [showBLProfile, setShowBLProfile] = useState(false);
     const [blInputs, setBLInputs] = useState({
         xc: 0.25,
@@ -44,102 +48,81 @@ function BoundaryLayer() {
         crossflow: null
     });
 
-    // Process simulation data on component mount to find .vis files
+    // --- Effect: Scan simulationData for .vis files on mount or change ---
     useEffect(() => {
-        console.log('Boundary Layer - Location state received:', location.state);
+        console.log('[DEBUG] Boundary Layer - simulationData:', simulationData);
 
-        if (location.state && location.state.simulationFolder) {
-            const receivedData = location.state.simulationFolder;
-            console.log('Boundary Layer - Raw simulation folder data:', receivedData);
-
-            setSimulationData(receivedData);
-
-            // Scan for .vis files in the simulation folder
-            if (receivedData && receivedData.files) {
-                const visFiles = [];
-
-                // Check if files is an object with different file types
-                if (typeof receivedData.files === 'object' && !Array.isArray(receivedData.files)) {
-                    // Look for .vis files in different file type categories
-                    Object.entries(receivedData.files).forEach(([fileType, fileList]) => {
-                        if (Array.isArray(fileList)) {
-                            fileList.forEach(file => {
-                                if (file.name && file.name.toLowerCase().endsWith('.vis')) {
-                                    visFiles.push(file);
-                                }
-                            });
-                        }
-                    });
-                } else if (Array.isArray(receivedData.files)) {
-                    // If files is an array, search directly
-                    receivedData.files.forEach(file => {
-                        if (file.name && file.name.toLowerCase().endsWith('.vis')) {
-                            visFiles.push(file);
-                        }
-                    });
-                }
-
-                console.log('Found .vis files:', visFiles);
-                setAvailableVisFiles(visFiles);
+        if (simulationData && simulationData.files) {
+            const visFiles = [];
+            // Check if files is an object with different file types
+            if (typeof simulationData.files === 'object' && !Array.isArray(simulationData.files)) {
+                Object.entries(simulationData.files).forEach(([fileType, fileList]) => {
+                    if (Array.isArray(fileList)) {
+                        fileList.forEach(file => {
+                            if (file.name && file.name.toLowerCase().endsWith('.vis')) {
+                                visFiles.push(file);
+                            }
+                        });
+                    }
+                });
+            } else if (Array.isArray(simulationData.files)) {
+                simulationData.files.forEach(file => {
+                    if (file.name && file.name.toLowerCase().endsWith('.vis')) {
+                        visFiles.push(file);
+                    }
+                });
             }
+            console.log('[DEBUG] Found .vis files:', visFiles);
+            setAvailableVisFiles(visFiles);
         }
-    }, [location.state]);
+    }, [simulationData]);
 
-    // Handle file import from computer
+    // --- Handle file import from computer ---
     const handleImportVis = () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.vis';
-
         input.onchange = async (event) => {
             const file = event.target.files[0];
             if (file) {
                 await processVisFile(file, true); // true indicates local file
             }
         };
-
         input.click();
     };
 
+    // --- Handle selection of .vis file from folder ---
     const handleSelectVisFromFolder = async (visFile) => {
         setLoading(true);
         setError(null);
-
         try {
-            console.log('Selected .vis file:', visFile);
-            // If file is local (imported), send as FormData
+            console.log('[DEBUG] Selected .vis file:', visFile);
             if (visFile.file) {
                 if (!(visFile.file instanceof File)) {
                     setError('Selected file is not a valid File object.');
                     setLoading(false);
                     return;
                 }
-                console.log('Processing local .vis file:', visFile.file.name, visFile.file);
+                console.log('[DEBUG] Processing local .vis file:', visFile.file.name, visFile.file);
                 await processVisFile(visFile.file, true, visFile.name);
             } else {
-                // If file is not local, try to fetch from server (for files in ./Simulations)
+                // Fetch file content from server for files in simulation folder
                 const simName = simulationData?.simName || 'unknown';
                 const response = await fetchAPI(`/get_file_content`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         simName: simName,
                         filePath: visFile.path || visFile.name
                     })
                 });
-
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-
-                // Convert the response to a File and send as FormData
                 const content = await response.text();
                 const blob = new Blob([content], { type: 'text/plain' });
                 const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
-
                 await processVisFile(fileObj, false, visFile.name);
             }
         } catch (error) {
@@ -149,34 +132,26 @@ function BoundaryLayer() {
         }
     };
 
-    // Common function to process .vis files (both local and server)
+    // --- Common function to process .vis files (both local and server) ---
     const processVisFile = async (file, isLocalFile = true, originalFileName = null) => {
         setLoading(true);
         setError(null);
-
         try {
             const formData = new FormData();
             formData.append('file', file);
-
             const response = await fetchAPI('/boundary_layer_data', {
                 method: 'POST',
                 body: formData
             });
-
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-
             const data = await response.json();
-            console.log('VIS data received:', data);
-
-            // Add the original filename for server files
+            console.log('[DEBUG] VIS data received:', data);
             if (!isLocalFile && originalFileName) {
                 data.fileName = originalFileName;
             }
-
             setVisData(data);
-
             // Update sections dropdown with level1 sections by default
             if (data.levels && data.levels.level1 && data.levels.level1.sections) {
                 const sectionOptions = Object.keys(data.levels.level1.sections)
@@ -189,16 +164,15 @@ function BoundaryLayer() {
                     .sort((a, b) => a.spanJ2 - b.spanJ2);
                 setSections(sectionOptions);
             }
-
         } catch (error) {
-            console.error('Error processing VIS file:', error);
+            console.error('[DEBUG] Error processing VIS file:', error);
             setError(`Error processing VIS file: ${error.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    // Update sections when level changes
+    // --- Update sections when level changes ---
     useEffect(() => {
         if (visData && visData.levels && visData.levels[selectedLevel]) {
             const levelSections = visData.levels[selectedLevel].sections;
@@ -225,73 +199,60 @@ function BoundaryLayer() {
         }
     }, [visData, selectedLevel]);
 
-    // Generate plot when section changes (only when not in BL profile mode)
+    // --- Generate plot when section changes (only when not in BL profile mode) ---
     useEffect(() => {
         if (visData && selectedLevel && selectedSection && !showBLProfile) {
             generateBoundaryLayerPlots();
         }
     }, [visData, selectedLevel, selectedSection, showBLProfile]);
 
-    // Function to separate upper and lower surface data
+    // --- Utility: Separate upper and lower surface data ---
     const separateSurfaceData = (xData, yData) => {
         if (!xData || !yData || xData.length === 0) {
             return { lower: { x: [], y: [] }, upper: { x: [], y: [] } };
         }
-
-        // Find the leading edge index (minimum x/c value)
         const minXValue = Math.min(...xData);
         const leIndex = xData.findIndex(x => x === minXValue);
-
-        // Split data into lower and upper surfaces
         const lowerSurface = {
             x: xData.slice(0, leIndex + 1),
             y: yData.slice(0, leIndex + 1)
         };
-
         const upperSurface = {
             x: xData.slice(leIndex),
             y: yData.slice(leIndex)
         };
-
         return { lower: lowerSurface, upper: upperSurface };
     };
 
-    // Interpolation function (2D bilinear interpolation)
+    // --- Utility: Interpolation function (2D nearest neighbor) ---
     const interpolate2D = (X, ETA, values, targetX, targetEta) => {
         if (!X || !ETA || !values || X.length === 0) {
             return NaN;
         }
-
-        // Simple nearest neighbor for now (can be enhanced with proper bilinear interpolation)
         let minDistance = Infinity;
         let nearestValue = NaN;
-
         for (let i = 0; i < X.length; i++) {
             for (let j = 0; j < X[i].length; j++) {
                 const distance = Math.sqrt(
                     Math.pow(X[i][j] - targetX, 2) +
                     Math.pow(ETA[i] - targetEta, 2)
                 );
-
                 if (distance < minDistance) {
                     minDistance = distance;
                     nearestValue = values[i][j];
                 }
             }
         }
-
         return nearestValue;
     };
 
-    // Calculate BL velocity profile
+    // --- Calculate BL velocity profile ---
     const calculateBLProfile = () => {
         if (!visData || !selectedLevel) {
             alert('Please load VIS data first');
             return;
         }
-
         const { xc, eta } = blInputs;
-
         // Create 2D mesh matrices from all sections
         const X = [];
         const ETA = [];
@@ -300,42 +261,32 @@ function BoundaryLayer() {
         const hMatrix = [];
         const cfMatrix = [];
         const betaMatrix = [];
-
         const levelData = visData.levels[selectedLevel];
         const sectionKeys = Object.keys(levelData.sections);
-
         sectionKeys.forEach((sectionKey, i) => {
             const section = levelData.sections[sectionKey];
-
-            // Determine surface range
             let startIdx, endIdx;
             if (selectedSurface === 'upper') {
-                // Upper surface: indices 100-180 (example range)
                 startIdx = Math.floor(section['x/c'].length * 0.55);
                 endIdx = section['x/c'].length - 1;
             } else {
-                // Lower surface: indices 20-100 (example range)
                 startIdx = Math.floor(section['x/c'].length * 0.1);
                 endIdx = Math.floor(section['x/c'].length * 0.55);
             }
-
             X.push(section['x/c'].slice(startIdx, endIdx + 1));
             thetaMatrix.push(section['Theta/c'].slice(startIdx, endIdx + 1));
             deltaMatrix.push(section['Dis/c'].slice(startIdx, endIdx + 1));
             hMatrix.push(section['H'].slice(startIdx, endIdx + 1));
             cfMatrix.push(section['Cf'].slice(startIdx, endIdx + 1));
             betaMatrix.push(section['Beta'].slice(startIdx, endIdx + 1));
-
             ETA.push(section.eta || i * 0.1);
         });
-
         // Interpolate values at the specified x/c and eta
         const theta = interpolate2D(X, ETA, thetaMatrix, xc, eta);
         const delta = interpolate2D(X, ETA, deltaMatrix, xc, eta);
         const H = interpolate2D(X, ETA, hMatrix, xc, eta);
         const cf = interpolate2D(X, ETA, cfMatrix, xc, eta);
         const beta = interpolate2D(X, ETA, betaMatrix, xc, eta);
-
         setBLParameters({
             theta: isNaN(theta) ? 'NaN' : theta.toExponential(4),
             delta: isNaN(delta) ? 'NaN' : delta.toExponential(4),
@@ -343,46 +294,32 @@ function BoundaryLayer() {
             cf: isNaN(cf) ? 'NaN' : cf.toExponential(4),
             beta: isNaN(beta) ? 'NaN' : beta.toFixed(4)
         });
-
         if (isNaN(theta) || isNaN(H) || isNaN(cf) || isNaN(beta)) {
             alert('Could not interpolate values at the specified location');
             return;
         }
-
         // Calculate velocity profiles
         const n = 2 / (H - 1);
-
-        // Solve quadratic equation for Px (simplified - using approximation)
         const a_coeff = 1.522 * Math.sqrt(cf / 2);
         const b_coeff = 8.0605 * Math.sqrt(cf / 2) - (H - 1) / H;
         const c_coeff = 12.6896 * Math.sqrt(cf / 2) - 2.5189 * (H - 1) / H;
-
         const discriminant = b_coeff * b_coeff - 4 * a_coeff * c_coeff;
         const Px = discriminant >= 0 ?
             (-b_coeff + Math.sqrt(discriminant)) / (2 * a_coeff) : 0;
-
-        // Generate y/delta values
         const y_delta = [];
         for (let i = 0; i <= 120; i++) {
             y_delta.push(i * 0.01);
         }
-
-        // Power law profile
         const u_power = y_delta.map(y =>
             y <= 1 ? Math.pow(y, 1 / n) : 1
         );
-
-        // Coles profile
         const u_Coles = y_delta.map(y => {
-            if (y <= 0.001) return 0; // Avoid log(0)
+            if (y <= 0.001) return 0;
             return 1 + Math.sqrt(cf / 2) * (5.8 * Math.log10(y) - (1 + Math.cos(Math.PI * y)) * Px);
         });
-
-        // Crossflow profile
         const w_profile = y_delta.map(y =>
             y < 1 ? u_Coles[y_delta.indexOf(y)] * Math.pow(1 - y, 2) * Math.tan(beta * Math.PI / 180) : 0
         );
-
         // Create streamwise velocity plot
         const streamwisePlot = {
             data: [{
@@ -394,34 +331,16 @@ function BoundaryLayer() {
                 line: { color: '#1f77b4', width: 2 }
             }],
             layout: {
-                title: {
-                    text: 'Streamwise Direction',
-                    font: { size: 16, family: 'Arial, sans-serif' }
-                },
-                xaxis: {
-                    title: { text: 'u/Ue', font: { size: 14 } },
-                    range: [0, 1.2],
-                    showgrid: true,
-                    gridcolor: '#e8e8e8'
-                },
-                yaxis: {
-                    title: { text: 'y/δ', font: { size: 14 } },
-                    range: [0, 1.2],
-                    showgrid: true,
-                    gridcolor: '#e8e8e8'
-                },
+                title: { text: 'Streamwise Direction', font: { size: 16, family: 'Arial, sans-serif' } },
+                xaxis: { title: { text: 'u/Ue', font: { size: 14 } }, range: [0, 1.2], showgrid: true, gridcolor: '#e8e8e8' },
+                yaxis: { title: { text: 'y/δ', font: { size: 14 } }, range: [0, 1.2], showgrid: true, gridcolor: '#e8e8e8' },
                 showlegend: false,
                 margin: { l: 60, r: 40, t: 60, b: 60 },
                 plot_bgcolor: 'white',
                 paper_bgcolor: 'white'
             },
-            config: {
-                displayModeBar: true,
-                displaylogo: false,
-                responsive: true
-            }
+            config: { displayModeBar: true, displaylogo: false, responsive: true }
         };
-
         // Create crossflow velocity plot
         const crossflowPlot = {
             data: [{
@@ -433,47 +352,27 @@ function BoundaryLayer() {
                 line: { color: '#1f77b4', width: 2 }
             }],
             layout: {
-                title: {
-                    text: 'Crossflow Direction',
-                    font: { size: 16, family: 'Arial, sans-serif' }
-                },
-                xaxis: {
-                    title: { text: 'w/Ue', font: { size: 14 } },
-                    showgrid: true,
-                    gridcolor: '#e8e8e8'
-                },
-                yaxis: {
-                    title: { text: 'y/δ', font: { size: 14 } },
-                    range: [0, 1.2],
-                    showgrid: true,
-                    gridcolor: '#e8e8e8'
-                },
+                title: { text: 'Crossflow Direction', font: { size: 16, family: 'Arial, sans-serif' } },
+                xaxis: { title: { text: 'w/Ue', font: { size: 14 } }, showgrid: true, gridcolor: '#e8e8e8' },
+                yaxis: { title: { text: 'y/δ', font: { size: 14 } }, range: [0, 1.2], showgrid: true, gridcolor: '#e8e8e8' },
                 showlegend: false,
                 margin: { l: 60, r: 40, t: 60, b: 60 },
                 plot_bgcolor: 'white',
                 paper_bgcolor: 'white'
             },
-            config: {
-                displayModeBar: true,
-                displaylogo: false,
-                responsive: true
-            }
+            config: { displayModeBar: true, displaylogo: false, responsive: true }
         };
-
         setBLPlots({
             streamwise: streamwisePlot,
             crossflow: crossflowPlot
         });
     };
 
+    // --- Generate boundary layer plots for selected section ---
     const generateBoundaryLayerPlots = () => {
         if (!visData || !selectedLevel || !selectedSection) return;
-
         const sectionData = visData.levels[selectedLevel].sections[selectedSection];
         if (!sectionData) return;
-
-        const sectionInfo = `Section ${sectionData.spanJ2} (η=${sectionData.eta?.toFixed(5)})`;
-
         // Common plot configuration
         const commonConfig = {
             displayModeBar: true,
@@ -481,38 +380,16 @@ function BoundaryLayer() {
             modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
             responsive: true
         };
-
         const commonLayoutProps = {
             showlegend: true,
-            legend: {
-                x: 0.02,
-                y: 0.98,
-                bgcolor: 'rgba(255,255,255,0.8)',
-                bordercolor: '#ddd',
-                borderwidth: 1
-            },
+            legend: { x: 0.02, y: 0.98, bgcolor: 'rgba(255,255,255,0.8)', bordercolor: '#ddd', borderwidth: 1 },
             margin: { l: 80, r: 50, t: 80, b: 70 },
             plot_bgcolor: 'white',
             paper_bgcolor: 'white',
-            xaxis: {
-                title: {
-                    text: 'x/c',
-                    font: { size: 14, family: 'Arial, sans-serif' }
-                },
-                showgrid: true,
-                gridcolor: '#e8e8e8',
-                range: [0, 1.00],
-                fixedrange: false,
-                tickfont: { size: 12, family: 'Arial, sans-serif' }
-            },
-            yaxis: {
-                showgrid: true,
-                gridcolor: '#e8e8e8',
-                tickfont: { size: 12, family: 'Arial, sans-serif' }
-            },
+            xaxis: { title: { text: 'x/c', font: { size: 14, family: 'Arial, sans-serif' } }, showgrid: true, gridcolor: '#e8e8e8', range: [0, 1.00], fixedrange: false, tickfont: { size: 12, family: 'Arial, sans-serif' } },
+            yaxis: { showgrid: true, gridcolor: '#e8e8e8', tickfont: { size: 12, family: 'Arial, sans-serif' } },
             autosize: true
         };
-
         // 1. Theta/c (Momentum Thickness) Plot
         const thetaSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['Theta/c']);
         const thetaPlot = {
@@ -538,23 +415,11 @@ function BoundaryLayer() {
             ],
             layout: {
                 ...commonLayoutProps,
-                title: {
-                    text: `Momentum Thickness (θ/c)`,
-                    font: { size: 16, family: 'Arial, sans-serif' },
-                    x: 0.5,
-                    xanchor: 'center'
-                },
-                yaxis: {
-                    ...commonLayoutProps.yaxis,
-                    title: {
-                        text: 'θ/c',
-                        font: { size: 14, family: 'Arial, sans-serif' }
-                    }
-                }
+                title: { text: `Momentum Thickness (θ/c)`, font: { size: 16, family: 'Arial, sans-serif' }, x: 0.5, xanchor: 'center' },
+                yaxis: { ...commonLayoutProps.yaxis, title: { text: 'θ/c', font: { size: 14, family: 'Arial, sans-serif' } } }
             },
             config: commonConfig
         };
-
         // 2. Dis/c (Displacement Thickness) Plot
         const deltaSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['Dis/c']);
         const deltaPlot = {
@@ -580,23 +445,11 @@ function BoundaryLayer() {
             ],
             layout: {
                 ...commonLayoutProps,
-                title: {
-                    text: `Displacement Thickness (δ*/c)`,
-                    font: { size: 16, family: 'Arial, sans-serif' },
-                    x: 0.5,
-                    xanchor: 'center'
-                },
-                yaxis: {
-                    ...commonLayoutProps.yaxis,
-                    title: {
-                        text: 'δ*/c',
-                        font: { size: 14, family: 'Arial, sans-serif' }
-                    }
-                }
+                title: { text: `Displacement Thickness (δ*/c)`, font: { size: 16, family: 'Arial, sans-serif' }, x: 0.5, xanchor: 'center' },
+                yaxis: { ...commonLayoutProps.yaxis, title: { text: 'δ*/c', font: { size: 14, family: 'Arial, sans-serif' } } }
             },
             config: commonConfig
         };
-
         // 3. H (Shape Factor) Plot
         const hSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['H']);
         const hbarPlot = {
@@ -622,23 +475,11 @@ function BoundaryLayer() {
             ],
             layout: {
                 ...commonLayoutProps,
-                title: {
-                    text: `Shape Factor (H)`,
-                    font: { size: 16, family: 'Arial, sans-serif' },
-                    x: 0.5,
-                    xanchor: 'center'
-                },
-                yaxis: {
-                    ...commonLayoutProps.yaxis,
-                    title: {
-                        text: 'H',
-                        font: { size: 14, family: 'Arial, sans-serif' }
-                    }
-                }
+                title: { text: `Shape Factor (H)`, font: { size: 16, family: 'Arial, sans-serif' }, x: 0.5, xanchor: 'center' },
+                yaxis: { ...commonLayoutProps.yaxis, title: { text: 'H', font: { size: 14, family: 'Arial, sans-serif' } } }
             },
             config: commonConfig
         };
-
         // 4. Cf (Skin Friction Coefficient) Plot
         const cfSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['Cf']);
         const cfPlot = {
@@ -664,23 +505,11 @@ function BoundaryLayer() {
             ],
             layout: {
                 ...commonLayoutProps,
-                title: {
-                    text: `Skin Friction Coefficient (Cf)`,
-                    font: { size: 16, family: 'Arial, sans-serif' },
-                    x: 0.5,
-                    xanchor: 'center'
-                },
-                yaxis: {
-                    ...commonLayoutProps.yaxis,
-                    title: {
-                        text: 'Cf',
-                        font: { size: 14, family: 'Arial, sans-serif' }
-                    }
-                }
+                title: { text: `Skin Friction Coefficient (Cf)`, font: { size: 16, family: 'Arial, sans-serif' }, x: 0.5, xanchor: 'center' },
+                yaxis: { ...commonLayoutProps.yaxis, title: { text: 'Cf', font: { size: 14, family: 'Arial, sans-serif' } } }
             },
             config: commonConfig
         };
-
         // 5. Beta Plot
         const betaSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['Beta']);
         const betaPlot = {
@@ -706,23 +535,11 @@ function BoundaryLayer() {
             ],
             layout: {
                 ...commonLayoutProps,
-                title: {
-                    text: `Beta (β)`,
-                    font: { size: 16, family: 'Arial, sans-serif' },
-                    x: 0.5,
-                    xanchor: 'center'
-                },
-                yaxis: {
-                    ...commonLayoutProps.yaxis,
-                    title: {
-                        text: 'Beta',
-                        font: { size: 14, family: 'Arial, sans-serif' }
-                    }
-                }
+                title: { text: `Beta (β)`, font: { size: 16, family: 'Arial, sans-serif' }, x: 0.5, xanchor: 'center' },
+                yaxis: { ...commonLayoutProps.yaxis, title: { text: 'Beta', font: { size: 14, family: 'Arial, sans-serif' } } }
             },
             config: commonConfig
         };
-
         // 6. Cp Plot
         const CpSurfaces = separateSurfaceData(sectionData['x/c'], sectionData['Cp']);
         const CpPlot = {
@@ -748,23 +565,11 @@ function BoundaryLayer() {
             ],
             layout: {
                 ...commonLayoutProps,
-                title: {
-                    text: `Pressure Coefficient (Cp)`,
-                    font: { size: 16, family: 'Arial, sans-serif' },
-                    x: 0.5,
-                    xanchor: 'center'
-                },
-                yaxis: {
-                    ...commonLayoutProps.yaxis,
-                    title: {
-                        text: 'Cp',
-                        font: { size: 14, family: 'Arial, sans-serif' }
-                    }
-                }
+                title: { text: `Pressure Coefficient (Cp)`, font: { size: 16, family: 'Arial, sans-serif' }, x: 0.5, xanchor: 'center' },
+                yaxis: { ...commonLayoutProps.yaxis, title: { text: 'Cp', font: { size: 14, family: 'Arial, sans-serif' } } }
             },
             config: commonConfig
         };
-
         setPlotData({
             theta: thetaPlot,
             delta: deltaPlot,
@@ -775,14 +580,17 @@ function BoundaryLayer() {
         });
     };
 
+    // --- Utility: Get levels for dropdown ---
     const getLevels = () => {
         if (!visData || !visData.levels) return [];
-
         return Object.keys(visData.levels).map(levelKey => ({
             value: levelKey,
             label: levelKey.charAt(0).toUpperCase() + levelKey.slice(1)
         }));
     };
+
+
+
     return (
         <div className="flex flex-col h-screen bg-blue-50 font-sans">
             {/* Header */}
@@ -843,16 +651,33 @@ function BoundaryLayer() {
                             File Information
                         </h3>
                         {visData ? (
-                            <div className="bg-blue-50 p-3 lg:p-4 rounded-lg border-l-4 border-blue-400">
-                                <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">File:</span> <span className="text-gray-900">{visData.fileName}</span></p>
-                                <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Levels Available:</span> <span className="text-gray-900">{Object.keys(visData.levels || {}).length}</span></p>
-                                {visData.levels[selectedLevel] && (
-                                    <>
-                                        <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Mach Number:</span> <span className="text-gray-900">{visData.levels[selectedLevel].machNumber}</span></p>
-                                        <p className="mb-2 text-sm"><span className="font-semibold text-gray-700">Reynolds Number:</span> <span className="text-gray-900">{visData.levels[selectedLevel].reynoldsNumber}</span></p>
-                                        <p className="text-sm"><span className="font-semibold text-gray-700">Angle of Attack:</span> <span className="text-gray-900">{visData.levels[selectedLevel].incidence}°</span></p>
-                                    </>
-                                )}
+                            <div className="bg-blue-50 p-3 lg:p-4 rounded-lg border-l-4 border-blue-400 break-words">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="mb-2 text-sm break-words">
+                                        <span className="font-semibold text-gray-700">File:</span>
+                                        <span className="text-gray-900 ml-1 break-all">{visData.fileName}</span>
+                                    </p>
+                                    <p className="mb-2 text-sm">
+                                        <span className="font-semibold text-gray-700">Levels Available:</span>
+                                        <span className="text-gray-900 ml-1">{Object.keys(visData.levels || {}).length}</span>
+                                    </p>
+                                    {visData.levels[selectedLevel] && (
+                                        <>
+                                            <p className="mb-2 text-sm">
+                                                <span className="font-semibold text-gray-700">Mach Number:</span>
+                                                <span className="text-gray-900 ml-1">{visData.levels[selectedLevel].machNumber}</span>
+                                            </p>
+                                            <p className="mb-2 text-sm">
+                                                <span className="font-semibold text-gray-700">Reynolds Number:</span>
+                                                <span className="text-gray-900 ml-1">{visData.levels[selectedLevel].reynoldsNumber}</span>
+                                            </p>
+                                            <p className="text-sm">
+                                                <span className="font-semibold text-gray-700">Angle of Attack:</span>
+                                                <span className="text-gray-900 ml-1">{visData.levels[selectedLevel].incidence}°</span>
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         ) : (
                             <div className="text-gray-600">

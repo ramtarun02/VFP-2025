@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from "react";
 import Plot from "react-plotly.js";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { fetchAPI } from '../utils/fetch';
-
-
+import { useSimulationData } from "../components/SimulationDataContext";
 
 function ContourPlot() {
     const navigate = useNavigate();
-    const location = useLocation();
-
-    // State for simulation info
-    const [simulationData, setSimulationData] = useState(null);
+    const { simulationData } = useSimulationData();
 
     // State for available .cp files and parsed cpData objects
     const [availableCpFiles, setAvailableCpFiles] = useState([]);
@@ -27,28 +23,17 @@ function ContourPlot() {
     const [minValue, setMinValue] = useState(0);
     const [maxValue, setMaxValue] = useState(1);
 
-    // Load simulation info and available .cp files from navigation state
+    // Load available .cp files from simulationData
     useEffect(() => {
-        if (location.state?.simulationFolder) {
-            setSimulationData(location.state.simulationFolder);
-        }
-        // Accept cpFiles as File objects or as {name, file} objects
-        if (location.state?.cpFiles) {
-            setAvailableCpFiles(location.state.cpFiles);
-            if (location.state.cpFiles.length > 0) {
-                setSelectedCpFile(location.state.cpFiles[0].name);
+        if (simulationData?.files?.cp) {
+            setAvailableCpFiles(simulationData.files.cp);
+            if (simulationData.files.cp.length > 0) {
+                setSelectedCpFile(simulationData.files.cp[0].name);
             }
         }
-        // If coming from post-processing with parsedCpData
-        if (location.state?.parsedCpData) {
-            setParsedCpFiles([{ fileName: location.state.cpFiles?.[0]?.name || "Loaded", data: location.state.parsedCpData }]);
-            setCpData(location.state.parsedCpData);
-        }
-        if (location.state?.selectedLevel) {
-            setSelectedLevel(location.state.selectedLevel);
-        }
-    }, [location.state]);
+    }, [simulationData]);
 
+    // Parse selected .cp file and store in array
     useEffect(() => {
         if (!selectedCpFile || !availableCpFiles.length) return;
         // Check if already parsed
@@ -81,8 +66,7 @@ function ContourPlot() {
                 setCpData(data);
             })
             .catch(() => setCpData(null));
-    }, [selectedCpFile, availableCpFiles]);
-
+    }, [selectedCpFile, availableCpFiles, simulationData]);
 
     // Levels dropdown
     useEffect(() => {
@@ -169,8 +153,6 @@ function ContourPlot() {
             setPlotData(null);
             return;
         }
-        console.log("Building surface grid for plot...", { cpData });
-
         const grid = buildSurfaceGrid(cpData, selectedLevel, contourType);
         if (!grid || grid.x.length === 0) {
             setPlotData(null);
@@ -211,7 +193,7 @@ function ContourPlot() {
                     xaxis: { title: "XPHYS" },
                     yaxis: { title: "YAVE" },
                     zaxis: { title: "ZPHYS" },
-                    aspectratio: { x: yAspect, y: yAspect, z: yAspect / 4 }
+                    aspectratio: { x: 1, y: yAspect, z: 0.75 }
                 },
                 margin: { l: 0, r: 0, t: 50, b: 0 },
                 paper_bgcolor: "white",

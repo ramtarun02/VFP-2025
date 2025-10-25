@@ -2,26 +2,33 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Plot from 'react-plotly.js';
 import { fetchAPI } from '../utils/fetch';
+import { useSimulationData } from "../components/SimulationDataContext"; // Use context from correct path
 
 function PostProcessing() {
+  // --- Routing and Context ---
   const navigate = useNavigate();
   const location = useLocation();
+  const { simulationData, setSimulationData } = useSimulationData(); // Use context for simulation data
 
-  // State variables
+  // --- UI State ---
   const [isExplorerOpen, setIsExplorerOpen] = useState(true);
   const [explorerWidth, setExplorerWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
-  const [simulationData, setSimulationData] = useState(null);
+  const resizeRef = useRef(null);
+
+  // --- File Selection State ---
   const [selectedFiles, setSelectedFiles] = useState({
     dat: null,
     cp: null,
     forces: null
   });
 
-  // Server response data states
+  // --- Server Response Data States ---
   const [parsedDatData, setParsedDatData] = useState(null);
   const [parsedForcesData, setParsedForcesData] = useState(null);
   const [parsedCpData, setParsedCpData] = useState(null);
+
+  // --- Dropdown and Plot States ---
   const [levels, setLevels] = useState([]);
   const [sections, setSections] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState('');
@@ -31,17 +38,16 @@ function PostProcessing() {
   const [plotData2, setPlotData2] = useState(null);
   const [meshData, setMeshData] = useState(null);
   const [showMesh, setShowMesh] = useState(false);
-  const resizeRef = useRef(null);
   const [showSpanwiseDistribution, setShowSpanwiseDistribution] = useState(false);
   const [selectedSpanwiseCoeff, setSelectedSpanwiseCoeff] = useState('CL');
   const [spanwiseData, setSpanwiseData] = useState(null);
 
-  // Loading states
+  // --- Loading States ---
   const [isLoadingCP, setIsLoadingCP] = useState(false);
   const [isLoadingForces, setIsLoadingForces] = useState(false);
   const [isLoadingDAT, setIsLoadingDAT] = useState(false);
 
-  // Coefficients data
+  // --- Coefficients Data ---
   const [coefficients, setCoefficients] = useState({
     CL: 0.000000,
     CD: 0.000000,
@@ -54,7 +60,7 @@ function PostProcessing() {
     cdWave: 0.000
   });
 
-  // Convert files array to expected object structure
+  // --- Utility: Convert files array to expected object structure ---
   const convertFilesArrayToObject = (filesArray) => {
     const fileTypes = {
       dat: [],
@@ -77,10 +83,7 @@ function PostProcessing() {
         console.log('Invalid file object:', file);
         return;
       }
-
       const ext = file.name.split('.').pop()?.toLowerCase() || 'other';
-      console.log(`Processing file: ${file.name}, extension: ${ext}`);
-
       if (fileTypes[ext]) {
         fileTypes[ext].push(file);
       } else {
@@ -88,54 +91,48 @@ function PostProcessing() {
       }
     });
 
-    // Sort each type alphabetically
     Object.keys(fileTypes).forEach(type => {
       fileTypes[type].sort((a, b) => a.name.localeCompare(b.name));
-      console.log(`${type} files:`, fileTypes[type].length);
     });
 
     return fileTypes;
   };
 
-  // Process simulation data on component mount
+  // --- Effect: Process simulation data on mount or location change ---
   useEffect(() => {
-    console.log('Location state received:', location.state);
+    console.log('[DEBUG] Location state received:', location.state);
 
     if (location.state && location.state.simulationFolder) {
-      console.log('Raw simulation folder data:', location.state.simulationFolder);
+      console.log('[DEBUG] Raw simulation folder data:', location.state.simulationFolder);
 
       const receivedData = location.state.simulationFolder;
       let finalData = null;
 
       if (receivedData.data) {
-        console.log('Processing server socket data:', receivedData.data);
+        console.log('[DEBUG] Processing server socket data:', receivedData.data);
         finalData = receivedData.data;
       } else {
-        console.log('Processing direct data:', receivedData);
+        console.log('[DEBUG] Processing direct data:', receivedData);
         finalData = receivedData;
       }
 
       if (finalData && Array.isArray(finalData.files)) {
-        console.log('Converting files array to object structure');
+        console.log('[DEBUG] Converting files array to object structure');
         finalData = {
           ...finalData,
           files: convertFilesArrayToObject(finalData.files)
         };
-        console.log('Converted data:', finalData);
+        console.log('[DEBUG] Converted data:', finalData);
       }
 
-      setSimulationData(finalData);
+      setSimulationData(finalData); // Store in context
     }
-  }, [location.state]);
+  }, [location.state, setSimulationData]);
 
-  // Update levels dropdown when parsed data changes
+  // --- Effect: Update levels dropdown when parsed data changes ---
   useEffect(() => {
-    console.log('Updating levels dropdown');
     let availableLevels = [];
-
-    // Prioritize CP data for levels, fallback to DAT data
     if (parsedCpData && parsedCpData.levels) {
-      console.log('Using CP data for levels:', Object.keys(parsedCpData.levels));
       availableLevels = Object.keys(parsedCpData.levels).map(levelKey => {
         const levelMatch = levelKey.match(/level(\d+)/);
         const levelNumber = levelMatch ? parseInt(levelMatch[1]) : 1;
@@ -146,7 +143,6 @@ function PostProcessing() {
         };
       });
     } else if (parsedDatData && parsedDatData.levels) {
-      console.log('Using DAT data for levels:', Object.keys(parsedDatData.levels));
       availableLevels = Object.keys(parsedDatData.levels).map(levelKey => {
         const levelMatch = levelKey.match(/level(\d+)/);
         const levelNumber = levelMatch ? parseInt(levelMatch[1]) : 1;
@@ -157,42 +153,30 @@ function PostProcessing() {
         };
       });
     }
-
-    // Sort levels by number (highest first, as per VFP convention)
     availableLevels.sort((a, b) => b.levelNumber - a.levelNumber);
-
-    console.log('Final level options:', availableLevels);
     setLevels(availableLevels);
 
-    // Reset selection if current level is not available
     if (selectedLevel && !availableLevels.find(level => level.value === selectedLevel)) {
       setSelectedLevel('');
       setSelectedSection('');
     }
   }, [parsedCpData, parsedDatData, selectedLevel]);
 
-  // Update sections dropdown when level selection changes
+  // --- Effect: Update sections dropdown when level selection changes ---
   useEffect(() => {
     if (parsedCpData && selectedLevel) {
-      console.log('Updating sections for level:', selectedLevel);
-
       if (parsedCpData.levels && parsedCpData.levels[selectedLevel]) {
         const level = parsedCpData.levels[selectedLevel];
-        console.log('Selected level data:', level);
-
         if (level.sections && Object.keys(level.sections).length > 0) {
           const sectionOptions = Object.entries(level.sections).map(([sectionKey, sectionData]) => {
             const sectionMatch = sectionKey.match(/section(\d+)/);
             let sectionNumber = sectionMatch ? parseInt(sectionMatch[1]) : 1;
-
-            // Also try to get section number from sectionHeader if available
             if (sectionData.sectionHeader) {
               const headerSectionMatch = sectionData.sectionHeader.match(/J=\s*(\d+)/);
               if (headerSectionMatch) {
                 sectionNumber = parseInt(headerSectionMatch[1]);
               }
             }
-
             return {
               value: sectionKey,
               label: `Section ${sectionNumber}`,
@@ -200,20 +184,14 @@ function PostProcessing() {
               data: sectionData
             };
           });
-
-          // Sort sections by section number
           sectionOptions.sort((a, b) => a.sectionNumber - b.sectionNumber);
-
-          console.log('Section options created:', sectionOptions);
           setSections(sectionOptions);
           setSelectedSection('');
         } else {
-          console.log('No sections found in level data');
           setSections([]);
           setSelectedSection('');
         }
       } else {
-        console.log('Selected level not found in CP data');
         setSections([]);
         setSelectedSection('');
       }
@@ -223,23 +201,17 @@ function PostProcessing() {
     }
   }, [parsedCpData, selectedLevel]);
 
-  // SIMPLIFIED: Direct file upload and parsing - no frontend processing
+  // --- File Upload and Parsing ---
   const uploadAndParseFile = async (file, fileType) => {
     try {
-      console.log(`Uploading and parsing ${fileType} file:`, file.name);
-
       const formData = new FormData();
       const simName = simulationData?.simName || 'unknown';
 
-      // Always append the actual file object
       if (file.file) {
-        // From folder import - file object is available
         formData.append('file', file.file);
       } else if (file instanceof File) {
-        // Direct file object
         formData.append('file', file);
       } else {
-        // From server simulation folder - need to fetch first
         const response = await fetchAPI(`/get_file_content`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -248,11 +220,9 @@ function PostProcessing() {
             filePath: file.path || file.name
           })
         });
-
         if (!response.ok) {
           throw new Error(`Failed to get file content: ${response.status}`);
         }
-
         const fileContent = await response.text();
         const blob = new Blob([fileContent], { type: 'text/plain' });
         formData.append('file', blob, file.name);
@@ -261,7 +231,6 @@ function PostProcessing() {
       formData.append('fileName', file.name);
       formData.append('simName', simName);
 
-      // Send directly to parse endpoint
       const parseResponse = await fetchAPI(`/parse_${fileType}`, {
         method: 'POST',
         body: formData
@@ -273,36 +242,25 @@ function PostProcessing() {
       }
 
       const parsedData = await parseResponse.json();
-      console.log(`Parsed ${fileType} data received:`, parsedData);
-
       return parsedData;
 
     } catch (error) {
-      console.error(`Error parsing ${fileType} file:`, error);
+      console.error(`[DEBUG] Error parsing ${fileType} file:`, error);
       alert(`Error parsing ${fileType} file: ${error.message}`);
       return null;
     }
   };
 
-  // SIMPLIFIED: File selection handler - immediate upload and parse
+  // --- File Selection Handler ---
   const handleFileSelect = async (file) => {
-    console.log('File selected:', file);
-
     const ext = file.name.split('.').pop().toLowerCase();
-    console.log('File extension:', ext);
+    if (!['dat', 'cp', 'forces'].includes(ext)) return;
 
-    if (!['dat', 'cp', 'forces'].includes(ext)) {
-      console.log('Non-parseable file type:', ext);
-      return;
-    }
-
-    // Update selected files immediately
     setSelectedFiles(prev => ({
       ...prev,
       [ext]: file
     }));
 
-    // Set loading state
     if (ext === 'cp') {
       setIsLoadingCP(true);
       setParsedCpData(null);
@@ -317,22 +275,15 @@ function PostProcessing() {
       setParsedDatData(null);
     }
 
-    // Upload and parse file immediately
     const parsedData = await uploadAndParseFile(file, ext);
 
-    // Update state based on file type
     if (ext === 'cp') {
       setIsLoadingCP(false);
-      if (parsedData) {
-        setParsedCpData(parsedData);
-        console.log('CP data set, levels dropdown will update automatically');
-      }
+      if (parsedData) setParsedCpData(parsedData);
     } else if (ext === 'forces') {
       setIsLoadingForces(false);
       if (parsedData) {
         setParsedForcesData(parsedData);
-
-        // Update coefficients with the highest level's data
         if (parsedData.levels && Object.keys(parsedData.levels).length > 0) {
           const levelKeys = Object.keys(parsedData.levels);
           const sortedLevelKeys = levelKeys.sort((a, b) => {
@@ -340,10 +291,8 @@ function PostProcessing() {
             const bNum = parseInt(b.match(/\d+/)?.[0] || 0);
             return bNum - aNum;
           });
-
           const highestLevelKey = sortedLevelKeys[0];
           const highestLevel = parsedData.levels[highestLevelKey];
-
           if (highestLevel.coefficients) {
             setCoefficients({
               CL: highestLevel.coefficients.CL || 0.000000,
@@ -351,7 +300,6 @@ function PostProcessing() {
               CM: highestLevel.coefficients.CM || 0.000000
             });
           }
-
           setDragBreakdown({
             cdInduced: highestLevel.vortexCoefficients?.CD || 0.000,
             cdViscous: highestLevel.viscousDragData?.totalViscousDrag || 0.000,
@@ -361,14 +309,11 @@ function PostProcessing() {
       }
     } else if (ext === 'dat') {
       setIsLoadingDAT(false);
-      if (parsedData) {
-        setParsedDatData(parsedData);
-        console.log('DAT data set, levels dropdown will update automatically');
-      }
+      if (parsedData) setParsedDatData(parsedData);
     }
   };
 
-  // Generate plots when selections change
+  // --- Plot Generation ---
   const generatePlotData = useCallback(() => {
     if (selectedLevel && selectedPlotType && selectedSection && parsedCpData && !showMesh) {
       generatePlot1Data();
@@ -380,41 +325,34 @@ function PostProcessing() {
     generatePlotData();
   }, [generatePlotData]);
 
-  // Generate spanwise plots when selections change
+  // --- Spanwise Plot Generation ---
   const generateSpanwisePlotData = useCallback(() => {
     if (selectedLevel && selectedSpanwiseCoeff && parsedCpData && showSpanwiseDistribution) {
-      console.log('generateSpanwisePlotData called');
-
-      if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
-        console.log('Level not found for spanwise:', selectedLevel);
-        return;
-      }
-
+      if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) return;
       const level = parsedCpData.levels[selectedLevel];
       const sections = level.sections;
+      if (!sections || Object.keys(sections).length === 0) return;
 
-      if (!sections || Object.keys(sections).length === 0) {
-        console.log('No sections found for spanwise');
-        return;
-      }
-
-      // Extract YAVE and coefficient values from section coefficients
       const yaveValues = [];
       const coeffValues = [];
+      let loadValues = [];
+      let maxY = 0;
 
       Object.values(sections).forEach((section) => {
         if (section.coefficients) {
           const yave = section.coefficients.YAVE;
-          let coeff;
+          if (yave !== undefined && Math.abs(yave) > maxY) maxY = Math.abs(yave);
 
+          let coeff;
           if (selectedSpanwiseCoeff === 'Load') {
-            // Calculate Load from CL (you can define this calculation later)
-            // For now, using CL as placeholder - replace with actual Load calculation
-            coeff = section.coefficients.CL; // TODO: Replace with actual Load calculation
+            // Load = CL * CHORD (if available, else fallback to 1)
+            const cl = section.coefficients.CL;
+            const chord = section.coefficients.CHORD || section.chord || 1;
+            coeff = (cl !== undefined && chord !== undefined) ? cl * chord : undefined;
+            loadValues.push(coeff);
           } else {
             coeff = section.coefficients[selectedSpanwiseCoeff];
           }
-
           if (yave !== undefined && coeff !== undefined) {
             yaveValues.push(yave);
             coeffValues.push(coeff);
@@ -422,46 +360,54 @@ function PostProcessing() {
         }
       });
 
-      if (yaveValues.length === 0 || coeffValues.length === 0) {
-        console.log('No valid spanwise data found');
-        return;
+      // For Load, also calculate ideal elliptic distribution
+      let plotDataArr = [];
+      if (selectedSpanwiseCoeff === 'Load') {
+        // Ideal elliptic distribution: sqrt(1 - (y/maxY)^2)
+        const idealLoad = yaveValues.map(y => Math.sqrt(1 - Math.pow(y / maxY, 2)));
+        plotDataArr = [
+          {
+            x: yaveValues,
+            y: loadValues,
+            type: 'scatter',
+            mode: 'markers',
+            marker: { color: '#334155', size: 8 },
+            line: { color: '#334155', width: 2 },
+            name: 'Spanwise Load'
+          },
+          {
+            x: yaveValues,
+            y: idealLoad,
+            type: 'scatter',
+            mode: 'markers',
+            line: { color: '#22c55e', dash: 'dash', width: 2 },
+            name: 'Ideal Elliptic'
+          }
+        ];
+      } else {
+        plotDataArr = [{
+          x: yaveValues,
+          y: coeffValues,
+          type: 'scatter',
+          mode: 'markers',
+          marker: { color: '#334155', size: 8 },
+          name: `${selectedSpanwiseCoeff} vs YAVE`
+        }];
       }
 
-      const plotColor = '#334155';
-
-      const spanwisePlotData = [{
-        x: yaveValues,
-        y: coeffValues,
-        type: 'scatter',
-        mode: 'markers',
-        marker: { color: plotColor, size: 8 },
-        name: `${selectedSpanwiseCoeff} vs YAVE`
-      }];
-
       const yAxisTitle = selectedSpanwiseCoeff === 'Load' ? 'Load' : selectedSpanwiseCoeff;
-
       const spanwisePlotLayout = {
         title: `Spanwise Distribution - ${yAxisTitle} vs YAVE (Level ${selectedLevel})`,
-        xaxis: {
-          title: 'YAVE',
-          showgrid: true,
-          zeroline: true,
-          showticklabels: true
-        },
-        yaxis: {
-          title: yAxisTitle,
-          showgrid: true,
-          zeroline: true,
-          showticklabels: true
-        },
+        xaxis: { title: 'YAVE', showgrid: true, zeroline: true, showticklabels: true },
+        yaxis: { title: yAxisTitle, showgrid: true, zeroline: true, showticklabels: true },
         margin: { l: 60, r: 40, t: 60, b: 60 },
-        showlegend: false,
+        showlegend: selectedSpanwiseCoeff === 'Load',
         plot_bgcolor: 'white',
         paper_bgcolor: 'white'
       };
 
       setSpanwiseData({
-        data: spanwisePlotData,
+        data: plotDataArr,
         layout: spanwisePlotLayout,
         config: {
           displayModeBar: true,
@@ -472,13 +418,11 @@ function PostProcessing() {
     }
   }, [selectedLevel, selectedSpanwiseCoeff, parsedCpData, showSpanwiseDistribution]);
 
-
-
   useEffect(() => {
     generateSpanwisePlotData();
   }, [generateSpanwisePlotData]);
 
-  // Resize handlers
+  // --- Resize Handlers ---
   const handleMouseDown = useCallback((e) => {
     setIsResizing(true);
     e.preventDefault();
@@ -508,7 +452,6 @@ function PostProcessing() {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     }
-
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -517,31 +460,25 @@ function PostProcessing() {
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  // Import folder handler
+  // --- Import Folder Handler ---
   const handleImportFolder = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.webkitdirectory = true;
     input.multiple = true;
-
     input.onchange = (event) => {
       const files = Array.from(event.target.files);
       if (files.length > 0) {
         const folderStructure = processFolderFiles(files);
-        setSimulationData(folderStructure);
+        setSimulationData(folderStructure); // Store in context
       }
     };
-
     input.click();
   };
 
-  // Navigate to ProWim handler
+  // --- Navigation Handlers ---
   const handleNavigateToProWim = () => {
-    navigate('/post-processing/prowim', {
-      state: {
-        simulationFolder: simulationData
-      }
-    });
+    navigate('/post-processing/prowim');
   };
 
   const handleContourPlotClick = () => {
@@ -549,20 +486,15 @@ function PostProcessing() {
       alert('Please select CP file and choose a level first.');
       return;
     }
-
-    const cpFiles = simulationData?.files?.cp || [];
-
-    navigate('/post-processing/contour-plot', {
-      state: {
-        simulationFolder: simulationData,
-        simName: simulationData?.simName,
-        parsedCpData: parsedCpData,
-        selectedLevel: selectedLevel,
-        cpFiles: cpFiles
-      }
-    });
+    // No need to pass simulationFolder in state, context will be used
+    navigate('/post-processing/contour-plot');
   };
 
+  const handleBoundaryLayerClick = () => {
+    navigate('/post-processing/boundary-layer');
+  };
+
+  // --- Folder Processing ---
   const processFolderFiles = (fileList) => {
     const files = fileList.map(file => ({
       name: file.name,
@@ -572,10 +504,8 @@ function PostProcessing() {
       isDirectory: false,
       file: file
     }));
-
     const sortedFiles = sortFilesByType(files);
     const folderName = files[0]?.path.split('/')[0] || 'Imported Folder';
-
     return {
       simName: folderName,
       folderPath: folderName,
@@ -594,7 +524,6 @@ function PostProcessing() {
       log: [],
       other: []
     };
-
     files.forEach(file => {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'other';
       if (fileTypes[ext]) {
@@ -603,21 +532,18 @@ function PostProcessing() {
         fileTypes.other.push(file);
       }
     });
-
     Object.keys(fileTypes).forEach(type => {
       fileTypes[type].sort((a, b) => a.name.localeCompare(b.name));
     });
-
     return fileTypes;
   };
 
-  // Mesh button handler
+  // --- Mesh Button Handler ---
   const handleMeshClick = () => {
     if (!parsedCpData || !selectedLevel) {
       alert('Please select CP file and choose a level first.');
       return;
     }
-
     if (showMesh) {
       setShowMesh(false);
       setMeshData(null);
@@ -627,34 +553,28 @@ function PostProcessing() {
     }
   };
 
-  // Optimized Generate mesh data
+  // --- Generate Mesh Data ---
   const generateMeshData = useCallback(() => {
     if (!parsedCpData || !selectedLevel) return;
     const level = parsedCpData.levels[selectedLevel];
     const sections = level.sections;
     if (!sections || Object.keys(sections).length === 0) return;
 
-    // Convert sections to array and sort by YAVE (spanwise order)
     const sectionsArray = Object.values(sections)
       .filter(section => section.coefficients && section.coefficients.YAVE !== undefined)
       .sort((a, b) => a.coefficients.YAVE - b.coefficients.YAVE);
 
-    // Downsample for performance if mesh is too fine
-    const maxSections = 40; // adjust for performance/quality tradeoff
+    const maxSections = 40;
     const maxChordPoints = 80;
     const sectionStep = Math.max(1, Math.floor(sectionsArray.length / maxSections));
     const sampledSections = sectionsArray.filter((_, idx) => idx % sectionStep === 0);
 
-    // Find minimum number of chordwise points across all sampled sections
     const minChordPoints = Math.min(
       ...sampledSections.map(s => (s['XPHYS'] ? s['XPHYS'].length : 0))
     );
     const chordStep = Math.max(1, Math.floor(minChordPoints / maxChordPoints));
 
-    // Precompute all coordinates for mesh lines
     const meshLines = [];
-
-    // Chordwise lines (along each section)
     for (let sIdx = 0; sIdx < sampledSections.length; sIdx++) {
       const section = sampledSections[sIdx];
       const xArr = section['XPHYS'] || [];
@@ -673,8 +593,6 @@ function PostProcessing() {
         });
       }
     }
-
-    // Spanwise lines (connect corresponding chordwise points between sections)
     for (let cIdx = 0; cIdx < minChordPoints; cIdx += chordStep) {
       const xLine = [];
       const yLine = [];
@@ -703,7 +621,6 @@ function PostProcessing() {
         });
       }
     }
-
     setMeshData({
       data: meshLines,
       layout: {
@@ -727,14 +644,12 @@ function PostProcessing() {
     });
   }, [parsedCpData, selectedLevel]);
 
-
-  // Add spanwise distribution button handler
+  // --- Spanwise Distribution Button Handler ---
   const handleSpanwiseDistributionClick = () => {
     if (!parsedCpData || !selectedLevel) {
       alert('Please select CP file and choose a level first.');
       return;
     }
-
     if (showSpanwiseDistribution) {
       setShowSpanwiseDistribution(false);
       setSpanwiseData(null);
@@ -745,63 +660,37 @@ function PostProcessing() {
     }
   };
 
-  // Generate 2D plot data - Plot 1 (Main plot: CP or Mach vs X/C) - Updated with color coding
+  // --- Generate 2D Plot Data (Plot 1: CP/Mach vs X/C) ---
   const generatePlot1Data = () => {
     if (!parsedCpData || !selectedLevel || !selectedSection) {
-      console.log('Missing data for plot1:', { parsedCpData: !!parsedCpData, selectedLevel, selectedSection });
       setPlotData1(null);
       return;
     }
-
-    console.log('Generating plot1 data for level:', selectedLevel, 'section:', selectedSection);
-
     if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
-      console.log('Level not found:', selectedLevel);
       setPlotData1(null);
       return;
     }
-
     const level = parsedCpData.levels[selectedLevel];
     if (!level.sections || !level.sections[selectedSection]) {
-      console.log('Section not found:', selectedSection);
       setPlotData1(null);
       return;
     }
-
     const section = level.sections[selectedSection];
-    console.log('Section data for plot1:', section);
-
-    // Extract data from the JSON structure
     const xValues = section['X/C'] || [];
     const yValues = selectedPlotType === 'Cp'
       ? (section['CP'] || [])
       : (section['M'] || []);
-
-    console.log('Plot1 data extracted:', {
-      xValuesLength: xValues.length,
-      yValuesLength: yValues.length,
-      plotType: selectedPlotType
-    });
-
     if (xValues.length === 0 || yValues.length === 0) {
-      console.log('No valid data for plot1');
       setPlotData1(null);
       return;
     }
-
-    // Find the minimum X/C value to separate upper and lower surfaces
     const minXIndex = xValues.indexOf(Math.min(...xValues));
-
-    // Split data into lower surface (0 to minXIndex) and upper surface (minXIndex to end)
     const lowerSurfaceX = xValues.slice(0, minXIndex + 1);
     const lowerSurfaceY = yValues.slice(0, minXIndex + 1);
     const upperSurfaceX = xValues.slice(minXIndex);
     const upperSurfaceY = yValues.slice(minXIndex);
-
-    // Set colors based on plot type
-    const lowerSurfaceColor = selectedPlotType === 'Cp' ? '#22c55e' : '#22c55e'; // Green for Cp lower, Green for Mach lower
-    const upperSurfaceColor = selectedPlotType === 'Cp' ? '#ef4444' : '#ef4444'; // Red for Cp upper, Red for Mach upper
-
+    const lowerSurfaceColor = '#22c55e';
+    const upperSurfaceColor = '#ef4444';
     const plot1Data = [
       {
         x: lowerSurfaceX,
@@ -822,8 +711,6 @@ function PostProcessing() {
         name: 'Upper Surface'
       }
     ];
-
-    // Extract section number for title
     const sectionMatch = selectedSection.match(/section(\d+)/);
     let sectionNumber = sectionMatch ? parseInt(sectionMatch[1]) : '';
     if (section.sectionHeader) {
@@ -832,14 +719,10 @@ function PostProcessing() {
         sectionNumber = parseInt(headerMatch[1]);
       }
     }
-
     const plot1Layout = {
       title: `${selectedPlotType} vs X/C - Section ${sectionNumber}`,
       xaxis: {
-        title: {
-          text: 'X/C',
-          font: { size: 14, family: 'Arial, sans-serif' }
-        },
+        title: { text: 'X/C', font: { size: 14, family: 'Arial, sans-serif' } },
         showgrid: true,
         zeroline: true,
         showticklabels: true
@@ -868,7 +751,6 @@ function PostProcessing() {
       plot_bgcolor: 'white',
       paper_bgcolor: 'white'
     };
-
     setPlotData1({
       data: plot1Data,
       layout: plot1Layout,
@@ -880,36 +762,28 @@ function PostProcessing() {
     });
   };
 
-
-  // Generate Plot 2 (Airfoil shape: Z/C vs X/C)
+  // --- Generate Plot 2 (Airfoil shape: Z/C vs X/C) ---
   const generatePlot2Data = () => {
     if (!parsedCpData || !selectedLevel || !selectedSection) {
       setPlotData2(null);
       return;
     }
-
     if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) {
       setPlotData2(null);
       return;
     }
-
     const level = parsedCpData.levels[selectedLevel];
     if (!level.sections || !level.sections[selectedSection]) {
       setPlotData2(null);
       return;
     }
-
     const section = level.sections[selectedSection];
-
-    // Extract airfoil coordinates
     const xValues = section['X/C'] || [];
     const zValues = section['Z/C'] || [];
-
     if (xValues.length === 0 || zValues.length === 0) {
       setPlotData2(null);
       return;
     }
-
     const plot2Data = [{
       x: xValues,
       y: zValues,
@@ -919,8 +793,6 @@ function PostProcessing() {
       marker: { color: '#334155', size: 4 },
       name: 'Airfoil Shape'
     }];
-
-    // Extract section number for title
     const sectionMatch = selectedSection.match(/section(\d+)/);
     let sectionNumber = sectionMatch ? parseInt(sectionMatch[1]) : '';
     if (section.sectionHeader) {
@@ -929,15 +801,9 @@ function PostProcessing() {
         sectionNumber = parseInt(headerMatch[1]);
       }
     }
-
     const plot2Layout = {
       title: `Airfoil Shape - Section ${sectionNumber}`,
-      xaxis: {
-        title: 'X/C',
-        showgrid: true,
-        zeroline: true,
-        showticklabels: true
-      },
+      xaxis: { title: 'X/C', showgrid: true, zeroline: true, showticklabels: true },
       yaxis: {
         title: 'Z/C',
         showgrid: true,
@@ -951,7 +817,6 @@ function PostProcessing() {
       plot_bgcolor: 'white',
       paper_bgcolor: 'white'
     };
-
     setPlotData2({
       data: plot2Data,
       layout: plot2Layout,
@@ -963,15 +828,7 @@ function PostProcessing() {
     });
   };
 
-  const handleBoundaryLayerClick = () => {
-    navigate('/post-processing/boundary-layer', {
-      state: {
-        simulationFolder: simulationData,
-        simName: simulationData?.simName
-      }
-    });
-  };
-
+  // --- Utility: File Selection ---
   const isFileSelected = (file) => {
     return Object.values(selectedFiles).some(selected => selected?.path === file.path);
   };
@@ -1004,7 +861,7 @@ function PostProcessing() {
     }
   };
 
-  // Render file explorer
+  // --- Render File Explorer ---
   const renderFileExplorer = () => {
     if (!simulationData) {
       return (
@@ -1024,12 +881,10 @@ function PostProcessing() {
         </div>
       );
     }
-
     const files = simulationData.files || {};
     const hasFiles = Object.keys(files).some(fileType =>
       Array.isArray(files[fileType]) && files[fileType].length > 0
     );
-
     if (!hasFiles) {
       return (
         <div className="flex flex-col items-center justify-center h-full p-6 text-center">
@@ -1044,7 +899,6 @@ function PostProcessing() {
         </div>
       );
     }
-
     return (
       <div className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -1061,13 +915,9 @@ function PostProcessing() {
             </div>
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-4">
           {Object.entries(files).map(([fileType, fileList]) => {
-            if (!Array.isArray(fileList) || fileList.length === 0) {
-              return null;
-            }
-
+            if (!Array.isArray(fileList) || fileList.length === 0) return null;
             return (
               <div key={fileType} className="mb-4">
                 <div className="flex items-center mb-2">
@@ -1079,7 +929,6 @@ function PostProcessing() {
                     const isLoading = (fileType === 'cp' && isLoadingCP) ||
                       (fileType === 'forces' && isLoadingForces) ||
                       (fileType === 'dat' && isLoadingDAT);
-
                     return (
                       <div
                         key={index}
@@ -1109,7 +958,7 @@ function PostProcessing() {
     );
   };
 
-  // MAIN RETURN - This is the actual page structure
+  // --- MAIN RETURN ---
   return (
     <div className="h-screen w-screen flex flex-col bg-blue-50 font-sans">
       {/* Header */}
@@ -1161,7 +1010,6 @@ function PostProcessing() {
           style={{ width: isExplorerOpen ? `${explorerWidth}px` : '0px' }}
         >
           {renderFileExplorer()}
-
           {/* Resize Handle */}
           {isExplorerOpen && (
             <div
@@ -1270,14 +1118,12 @@ function PostProcessing() {
               >
                 {showMesh ? 'Hide Mesh' : 'Show Mesh'}
               </button>
-
               <button
                 className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 onClick={handleBoundaryLayerClick}
               >
                 Boundary Layer Data
               </button>
-
               <button
                 className={`w-full px-4 py-2.5 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${showSpanwiseDistribution
                   ? 'bg-blue-600 text-white shadow-sm focus:ring-blue-500'
@@ -1289,8 +1135,7 @@ function PostProcessing() {
               </button>
             </div>
           </div>
-
-          {/* Configuration Section - Updated with Load option */}
+          {/* Configuration Section */}
           <div className="p-4 border-b border-blue-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Configuration</h3>
             <div className="space-y-3">
@@ -1309,7 +1154,6 @@ function PostProcessing() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Plot Type</label>
                 <select
@@ -1322,7 +1166,6 @@ function PostProcessing() {
                   <option value="Cp">Cp</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
                 <select
@@ -1339,7 +1182,6 @@ function PostProcessing() {
                   ))}
                 </select>
               </div>
-
               {showSpanwiseDistribution && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Coefficient</label>
@@ -1357,9 +1199,6 @@ function PostProcessing() {
               )}
             </div>
           </div>
-
-
-
           {/* Coefficients Section */}
           <div className="p-4 flex-1">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Aerodynamic Coefficients</h3>
@@ -1383,7 +1222,6 @@ function PostProcessing() {
                 </div>
               </div>
             </div>
-
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Drag Breakdown</h3>
             <div className="space-y-3">
               <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
