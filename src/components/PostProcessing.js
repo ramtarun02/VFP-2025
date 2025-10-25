@@ -550,12 +550,15 @@ function PostProcessing() {
       return;
     }
 
+    const cpFiles = simulationData?.files?.cp || [];
+
     navigate('/post-processing/contour-plot', {
       state: {
         simulationFolder: simulationData,
         simName: simulationData?.simName,
         parsedCpData: parsedCpData,
-        selectedLevel: selectedLevel
+        selectedLevel: selectedLevel,
+        cpFiles: cpFiles
       }
     });
   };

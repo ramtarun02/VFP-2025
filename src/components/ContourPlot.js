@@ -1,16 +1,24 @@
-import { contours } from "d3";
 import React, { useState, useEffect } from "react";
-import { BsAspectRatio } from "react-icons/bs";
 import Plot from "react-plotly.js";
 import { useNavigate, useLocation } from "react-router-dom";
+import { fetchAPI } from '../utils/fetch';
+
+
 
 function ContourPlot() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // State
+    // State for simulation info
     const [simulationData, setSimulationData] = useState(null);
+
+    // State for available .cp files and parsed cpData objects
+    const [availableCpFiles, setAvailableCpFiles] = useState([]);
+    const [parsedCpFiles, setParsedCpFiles] = useState([]);
+    const [selectedCpFile, setSelectedCpFile] = useState("");
     const [cpData, setCpData] = useState(null);
+
+    // Plot config states
     const [levels, setLevels] = useState([]);
     const [selectedLevel, setSelectedLevel] = useState("");
     const [contourType, setContourType] = useState("CP");
@@ -19,18 +27,62 @@ function ContourPlot() {
     const [minValue, setMinValue] = useState(0);
     const [maxValue, setMaxValue] = useState(1);
 
-    // Load data from navigation state
+    // Load simulation info and available .cp files from navigation state
     useEffect(() => {
         if (location.state?.simulationFolder) {
             setSimulationData(location.state.simulationFolder);
         }
+        // Accept cpFiles as File objects or as {name, file} objects
+        if (location.state?.cpFiles) {
+            setAvailableCpFiles(location.state.cpFiles);
+            if (location.state.cpFiles.length > 0) {
+                setSelectedCpFile(location.state.cpFiles[0].name);
+            }
+        }
+        // If coming from post-processing with parsedCpData
         if (location.state?.parsedCpData) {
+            setParsedCpFiles([{ fileName: location.state.cpFiles?.[0]?.name || "Loaded", data: location.state.parsedCpData }]);
             setCpData(location.state.parsedCpData);
         }
         if (location.state?.selectedLevel) {
             setSelectedLevel(location.state.selectedLevel);
         }
     }, [location.state]);
+
+    useEffect(() => {
+        if (!selectedCpFile || !availableCpFiles.length) return;
+        // Check if already parsed
+        const existing = parsedCpFiles.find(f => f.fileName === selectedCpFile);
+        if (existing) {
+            setCpData(existing.data);
+            return;
+        }
+        // Find file object
+        const fileObj = availableCpFiles.find(f => {
+            const fileName = f.name || (f.file && f.file.name) || (f instanceof File ? f.name : "");
+            return fileName === selectedCpFile;
+        });
+        if (!fileObj) return;
+
+        // Prepare FormData for file upload
+        const file = fileObj.file || fileObj;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("fileName", file.name);
+        formData.append("simName", simulationData?.simName || "unknown");
+
+        fetchAPI("/parse_cp", {
+            method: "POST",
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                setParsedCpFiles(prev => [...prev, { fileName: selectedCpFile, data }]);
+                setCpData(data);
+            })
+            .catch(() => setCpData(null));
+    }, [selectedCpFile, availableCpFiles]);
+
 
     // Levels dropdown
     useEffect(() => {
@@ -112,18 +164,27 @@ function ContourPlot() {
         };
     }
 
-
-
     useEffect(() => {
         if (!cpData || !selectedLevel || !cpData.levels[selectedLevel]) {
             setPlotData(null);
             return;
         }
+        console.log("Building surface grid for plot...", { cpData });
 
         const grid = buildSurfaceGrid(cpData, selectedLevel, contourType);
         if (!grid || grid.x.length === 0) {
             setPlotData(null);
             return;
+        }
+
+        // Extract YTIP from flowParameters string and round to nearest integer
+        let yAspect = 2.0; // default
+        const flowParams = cpData.levels[selectedLevel]?.flowParameters;
+        if (flowParams && typeof flowParams === "string") {
+            const match = flowParams.match(/YTIP=\s*([\d.]+)/);
+            if (match && match[1]) {
+                yAspect = Math.round(parseFloat(match[1]));
+            }
         }
 
         setPlotData({
@@ -150,7 +211,7 @@ function ContourPlot() {
                     xaxis: { title: "XPHYS" },
                     yaxis: { title: "YAVE" },
                     zaxis: { title: "ZPHYS" },
-                    aspectratio: { x: 1, y: 3, z: 0.75 }
+                    aspectratio: { x: yAspect, y: yAspect, z: yAspect / 4 }
                 },
                 margin: { l: 0, r: 0, t: 50, b: 0 },
                 paper_bgcolor: "white",
@@ -164,7 +225,6 @@ function ContourPlot() {
             }
         });
     }, [cpData, selectedLevel, contourType, minValue, maxValue]);
-
 
     // UI
     return (
@@ -194,7 +254,7 @@ function ContourPlot() {
                             </p>
                             <p className="text-sm">
                                 <span className="font-semibold text-gray-700">CP File:</span>
-                                <span className="text-gray-900"> {cpData?.fileName || "Loaded"}</span>
+                                <span className="text-gray-900"> {selectedCpFile || "None"}</span>
                             </p>
                         </div>
                     </div>
@@ -202,6 +262,23 @@ function ContourPlot() {
                         <h3 className="text-lg font-semibold text-gray-800 mb-3 pb-2 border-b-2 border-blue-400">
                             Plot Configuration
                         </h3>
+                        {/* CP File Selection */}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">CP File</label>
+                            <select
+                                value={selectedCpFile}
+                                onChange={e => setSelectedCpFile(e.target.value)}
+                                className="w-full px-3 py-2 border border-blue-300 rounded-lg bg-white text-gray-900"
+                            >
+                                {availableCpFiles.map((f, idx) => {
+                                    // Support both {name, file} and File objects
+                                    const fileName = f.name || (f.file && f.file.name) || (f instanceof File ? f.name : `cpfile_${idx}`);
+                                    return (
+                                        <option key={fileName} value={fileName}>{fileName}</option>
+                                    );
+                                })}
+                            </select>
+                        </div>
                         {/* Level Selection */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Level</label>
@@ -292,7 +369,7 @@ function ContourPlot() {
                                 Welcome to 3D Wing Contour Visualization
                             </h2>
                             <p className="text-gray-600 text-lg mb-6">
-                                Select level and configure parameters to display 3D contour plots
+                                Select a CP file, level, and configure parameters to display 3D contour plots
                             </p>
                         </div>
                     )}
