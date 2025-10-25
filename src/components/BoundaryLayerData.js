@@ -101,25 +101,24 @@ function BoundaryLayer() {
         input.click();
     };
 
-    // Update the handleSelectVisFromFolder function
     const handleSelectVisFromFolder = async (visFile) => {
-        console.log('Selected .vis file from folder:', visFile);
         setLoading(true);
         setError(null);
 
         try {
-            // Check if the file has content property (already uploaded to server)
-            if (visFile.content) {
-                // File content is already available, process directly
-                const blob = new Blob([visFile.content], { type: 'text/plain' });
-                const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
-                await processVisFile(fileObj, false, visFile.name);
+            console.log('Selected .vis file:', visFile);
+            // If file is local (imported), send as FormData
+            if (visFile.file) {
+                if (!(visFile.file instanceof File)) {
+                    setError('Selected file is not a valid File object.');
+                    setLoading(false);
+                    return;
+                }
+                console.log('Processing local .vis file:', visFile.file.name, visFile.file);
+                await processVisFile(visFile.file, true, visFile.name);
             } else {
-                // File needs to be fetched from server
+                // If file is not local, try to fetch from server (for files in ./Simulations)
                 const simName = simulationData?.simName || 'unknown';
-                console.log('Using simulation name:', simName);
-                console.log('File path:', visFile.path || visFile.name);
-
                 const response = await fetchAPI(`/get_file_content`, {
                     method: 'POST',
                     headers: {
@@ -136,17 +135,14 @@ function BoundaryLayer() {
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
 
+                // Convert the response to a File and send as FormData
                 const content = await response.text();
-                console.log('VIS file content fetched successfully, length:', content.length);
-
                 const blob = new Blob([content], { type: 'text/plain' });
                 const fileObj = new File([blob], visFile.name, { type: 'text/plain' });
 
                 await processVisFile(fileObj, false, visFile.name);
             }
-
         } catch (error) {
-            console.error('Error fetching .vis file from server:', error);
             setError(`Error loading .vis file: ${error.message}`);
         } finally {
             setLoading(false);

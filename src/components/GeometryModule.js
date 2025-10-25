@@ -121,7 +121,12 @@ function GeometryModule() {
             ...prev,
             endSection: firstFile.originalGeoData.length
           }));
+
+          // FIX: Update wingSpecs here
+          const geoData = firstFile.modifiedGeoData || firstFile.originalGeoData;
+          setWingSpecs(calculateWingSpecs(geoData));
         }
+
 
         // Add all new files to visible 2D files by default
         const newFileIds = newGeoFiles.map(file => file.id);
@@ -206,8 +211,7 @@ function GeometryModule() {
       setSelectedSection(selectedFile.selectedSection);
       updateParameters(selectedFile.selectedSection);
       setModifiedParameters({}); // Clear modified parameters when switching files
-      const specs = calculateWingSpecs(geoData);
-      setWingSpecs(specs);
+      setWingSpecs(calculateWingSpecs(geoData)); // <-- FIX: update specs here
 
       // Update improve settings with available sections
       setImproveSettings(prev => ({
@@ -318,7 +322,6 @@ function GeometryModule() {
       return;
     }
 
-    const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
     const numSections = geoData.length;
 
     if (startSection > numSections || endSection > numSections) {
@@ -358,6 +361,9 @@ function GeometryModule() {
           modifiedGeoData: updatedGeoData,
           modifiedPlotData: updatedPlotData
         }));
+        const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
+        setWingSpecs(calculateWingSpecs(geoData)); // <-- FIX: update specs here
+
 
         // Update parameters if a section is selected
         if (selectedSection >= 0) {
@@ -392,6 +398,10 @@ function GeometryModule() {
       modifiedGeoData: null,
       modifiedPlotData: null
     }));
+
+    const geoData = selectedGeoFile.originalGeoData;
+    setWingSpecs(calculateWingSpecs(geoData));
+
 
     // Update parameters if a section is selected
     if (selectedSection >= 0) {
@@ -478,6 +488,7 @@ function GeometryModule() {
         // Update parameters with new baseline values and clear modified parameters
         updateParameters(selectedSection);
         setModifiedParameters({}); // Clear modified parameters after successful computation
+        setWingSpecs(calculateWingSpecs(updatedGeoData)); // <-- FIX: update specs here
 
         console.log('Updated Geo Data:', updatedGeoData);
       }

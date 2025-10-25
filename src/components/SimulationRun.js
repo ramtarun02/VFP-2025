@@ -17,6 +17,7 @@ import { useContext } from "react";
 import FormDataContext from "./FormDataContext";
 
 import { createSocket } from '../utils/socket';
+import { min } from "d3";
 
 // Register Chart.js components
 ChartJS.register(
@@ -302,6 +303,7 @@ const SimulationRun = () => {
           padding: { bottom: 5 },
         },
         type: "linear",
+        min: -0.0001,
         ticks: {
           color: "#6b7280",
           font: {
