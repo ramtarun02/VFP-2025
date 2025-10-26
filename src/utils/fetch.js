@@ -24,18 +24,38 @@ const getBaseURL = () => {
 
 const BASE_URL = getBaseURL();
 
-// Create a custom fetch that automatically adds the base URL
-export const fetchAPI = (url, options = {}) => {
-    // If URL already includes http, use it as is (for external APIs)
-    if (url.startsWith('http')) {
-        console.log('External URL detected, using as is:', url);
-        return fetch(url, options);
+export const fetchAPI = async (url, options = {}) => {
+    const fullURL = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+    const response = await fetch(fullURL, options);
+
+    // Get content type
+    const contentType = response.headers.get('content-type') || '';
+
+    // If response is a zip or other binary, return blob
+    if (contentType.includes('application/zip') || contentType.includes('application/octet-stream')) {
+        return {
+            ok: response.ok,
+            status: response.status,
+            headers: response.headers,
+            blob: () => response.blob(),
+            response // for advanced use
+        };
     }
 
-    // Otherwise, prepend our base URL
-    const fullURL = `${BASE_URL}${url}`;
-    console.log('API call to:', fullURL);
-    return fetch(fullURL, options);
+    // Otherwise, try to parse as JSON
+    let data;
+    try {
+        data = await response.json();
+    } catch {
+        data = null;
+    }
+    return {
+        ok: response.ok,
+        status: response.status,
+        headers: response.headers,
+        json: () => Promise.resolve(data),
+        response
+    };
 };
 
 // Export the base URL too

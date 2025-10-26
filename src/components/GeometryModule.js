@@ -3,6 +3,7 @@ import Plot3D from './Plot3D';
 import Plot2D from './Plot2D';
 import { useNavigate } from "react-router-dom";
 import { fetchAPI } from '../utils/fetch';
+import { Fragment } from 'react';
 
 function GeometryModule() {
   const [geoFiles, setGeoFiles] = useState([]); // Array to store multiple GEO files
@@ -21,6 +22,29 @@ function GeometryModule() {
     numSections: 0,
     taperRatio: 0
   });
+  const [fpconOpen, setFpconOpen] = useState(false);
+  const [fpconParams, setFpconParams] = useState({
+    geoName: '',
+    mach: '',
+    incidence: '',
+    bodyRadius: '',
+    aspectRatio: '',
+    taperRatio: '',
+    sweepAngle: '',
+    nsect: 1,
+    nchange: 0,
+    changeSections: [],
+    etas: [''],
+    hsect: [''],
+    xtwsec: [''],
+    twsin: [''],
+    files: [],
+    clcd_conv: false
+  });
+
+  const [fpconDownloadUrl, setFpconDownloadUrl] = useState(null);
+
+
 
   // New state for Improve Panel
   const [improveSettings, setImproveSettings] = useState({
@@ -29,6 +53,111 @@ function GeometryModule() {
     endSection: 1,
     aValue: 0
   });
+
+  // Handle FPCON input changes
+  const handleFpconChange = (field, value, idx) => {
+    if (['etas', 'hsect', 'xtwsec', 'twsin'].includes(field)) {
+      setFpconParams(prev => {
+        const arr = [...prev[field]];
+        arr[idx] = value;
+        return { ...prev, [field]: arr };
+      });
+    } else if (field === 'changeSections') {
+      setFpconParams(prev => ({
+        ...prev,
+        changeSections: value.split(',').map(v => v.trim()).filter(Boolean)
+      }));
+    } else if (field === 'files') {
+      setFpconParams(prev => ({
+        ...prev,
+        files: Array.from(value)
+      }));
+    } else if (field === 'clcd_conv') {
+      setFpconParams(prev => ({
+        ...prev,
+        clcd_conv: value
+      }));
+    } else {
+      setFpconParams(prev => ({
+        ...prev,
+        [field]: value
+      }));
+      // Update arrays when nsect changes
+      if (field === 'nsect') {
+        const n = Number(value) || 1;
+        setFpconParams(prev => ({
+          ...prev,
+          etas: Array(n).fill(''),
+          hsect: Array(n).fill(''),
+          xtwsec: Array(n).fill(''),
+          twsin: Array(n).fill('')
+        }));
+      }
+    }
+  };
+
+  // Update handleFpconSubmit to show download button if success
+  const handleFpconSubmit = async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('geoName', fpconParams.geoName);
+    formData.append('aspectRatio', fpconParams.aspectRatio);
+    formData.append('taperRatio', fpconParams.taperRatio);
+    formData.append('sweepAngle', fpconParams.sweepAngle);
+    formData.append('mach', fpconParams.mach);
+    formData.append('incidence', fpconParams.incidence);
+    formData.append('body_radius', fpconParams.bodyRadius);
+    formData.append('nsect', fpconParams.nsect);
+    formData.append('nchange', fpconParams.nchange);
+    formData.append('clcd_conv', fpconParams.clcd_conv ? 'y' : 'n');
+    fpconParams.changeSections.forEach((sec, idx) => {
+      formData.append(`changeSections[]`, sec);
+    });
+    fpconParams.etas.forEach((val, idx) => {
+      formData.append(`etas[]`, val);
+    });
+    fpconParams.hsect.forEach((val, idx) => {
+      formData.append(`hsect[]`, val);
+    });
+    fpconParams.xtwsec.forEach((val, idx) => {
+      formData.append(`xtwsec[]`, val);
+    });
+    fpconParams.twsin.forEach((val, idx) => {
+      formData.append(`twsin[]`, val);
+    });
+    fpconParams.files.forEach((file, idx) => {
+      formData.append(`file${idx + 1}`, file);
+    });
+
+    try {
+      const response = await fetchAPI('/fpcon', {
+        method: 'POST',
+        body: formData
+      });
+
+
+      console.log('FPCON response:', response);
+      // If response is a file (zip), create a download URL
+      if (response.ok && response.headers.get('content-type')?.includes('application/zip')) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        setFpconDownloadUrl(url);
+      } else {
+        // Try to parse error message
+        let errorMsg = 'Unknown error';
+        try {
+          const result = await response.json();
+          errorMsg = result.error || errorMsg;
+        } catch { }
+        alert('Error: ' + errorMsg);
+        setFpconOpen(false);
+      }
+    } catch (err) {
+      alert('Submission failed: ' + err.message);
+      setFpconOpen(false);
+    }
+  };
 
   const calculateWingSpecs = (geoData) => {
     if (!geoData || geoData.length === 0) {
@@ -739,7 +868,10 @@ function GeometryModule() {
             >
               Back to Main Module
             </button>
-            <button className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md">
+            <button
+              className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md"
+              onClick={() => setFpconOpen(true)}
+            >
               FPCON
             </button>
             <div className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md cursor-pointer">
@@ -777,177 +909,438 @@ function GeometryModule() {
             </button>
           </div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex lg:flex-row flex-col gap-4 p-4 min-h-screen">
-        {/* Left Side - Main Content */}
-        <div className="flex-1 lg:w-3/4 space-y-4">
-          {/* Combined Controls Panel - All in one horizontal line */}
-          {geoFiles.length > 0 && (
-            <div className="bg-white rounded-xl shadow-md p-3">
-              <div className="flex flex-wrap items-center gap-6">
-                {/* 3D Plot File Selection */}
-                <div className="flex items-center gap-3">
-                  <label htmlFor="geo-file-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
-                    3D Plot File:
-                  </label>
-                  <select
-                    id="geo-file-select"
-                    onChange={handleGeoFileSelection}
-                    value={selectedGeoFile?.id || ''}
-                    className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                  >
-                    {geoFiles.map((file) => (
-                      <option key={file.id} value={file.id}>
-                        {file.name}
-                      </option>
-                    ))}
-                  </select>
+      </header >
+      {/* FPCON Modal */}
+      {fpconOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto p-8 relative" style={{ maxHeight: '90vh', overflow: 'auto' }}>
+            <button
+              className="absolute top-3 right-3 text-gray-500 hover:text-red-600 text-xl font-bold"
+              onClick={() => { setFpconOpen(false); setFpconDownloadUrl(null); }}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">FPCON Wing Geometry Input</h2>
+            <form onSubmit={handleFpconSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Geometry Name</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.geoName}
+                    onChange={e => handleFpconChange('geoName', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Aspect Ratio</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.aspectRatio}
+                    onChange={e => handleFpconChange('aspectRatio', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Taper Ratio</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.taperRatio}
+                    onChange={e => handleFpconChange('taperRatio', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LE Sweep Angle (deg)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.sweepAngle}
+                    onChange={e => handleFpconChange('sweepAngle', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mach Number</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.mach}
+                    onChange={e => handleFpconChange('mach', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Incidence Angle</label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.incidence}
+                    onChange={e => handleFpconChange('incidence', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Body Radius (c0) </label>
+                  <input
+                    type="number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.bodyRadius}
+                    onChange={e => handleFpconChange('bodyRadius', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Number of Sections (NSECT)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.nsect}
+                    onChange={e => handleFpconChange('nsect', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">NCHANGE</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={fpconParams.nsect - 1}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fpconParams.nchange}
+                    onChange={e => handleFpconChange('nchange', e.target.value)}
+                    required
+                  />
                 </div>
 
-                {/* Section Selection */}
-                {sections.length > 0 && (
+                <div className="col-span-2 flex items-center mt-2">
+                  <input
+                    type="checkbox"
+                    id="clcd_conv"
+                    checked={fpconParams.clcd_conv}
+                    onChange={e => handleFpconChange('clcd_conv', e.target.checked)}
+                    className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="clcd_conv" className="text-sm font-medium text-gray-700">
+                    Require CL/CD Convergence
+                  </label>
+                </div>
+                {fpconParams.nchange > 0 && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Section numbers that differ (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode='text'
+                      pattern='.*'
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g. 2,3,4"
+                      value={fpconParams.changeSections.join(',')}
+                      onChange={e => handleFpconChange('changeSections', e.target.value)}
+                      required={fpconParams.nchange > 0}
+                    />
+                  </div>
+                )}
+              </div>
+              {/* Dynamic Section Inputs */}
+              <div>
+                <h3 className="text-md font-semibold text-blue-600 mb-2">Section Data (for each section)</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 rounded">
+                    <thead>
+                      <tr className="bg-blue-50">
+                        <th className="px-2 py-1 text-xs font-bold text-gray-700">Section</th>
+                        <th className="px-2 py-1 text-xs font-bold text-gray-700">Etas</th>
+                        <th className="px-2 py-1 text-xs font-bold text-gray-700">HSECT</th>
+                        <th className="px-2 py-1 text-xs font-bold text-gray-700">XTWSEC</th>
+                        <th className="px-2 py-1 text-xs font-bold text-gray-700">TWSIN</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: fpconParams.nsect }, (_, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="px-2 py-1 text-xs text-gray-700 font-semibold text-center">{idx + 1}</td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="1"
+                              className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={fpconParams.etas[idx] || ''}
+                              onChange={e => handleFpconChange('etas', e.target.value, idx)}
+                              required
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={fpconParams.hsect[idx] || ''}
+                              onChange={e => handleFpconChange('hsect', e.target.value, idx)}
+                              required
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={fpconParams.xtwsec[idx] || ''}
+                              onChange={e => handleFpconChange('xtwsec', e.target.value, idx)}
+                              required
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              value={fpconParams.twsin[idx] || ''}
+                              onChange={e => handleFpconChange('twsin', e.target.value, idx)}
+                              required
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Files</label>
+                <input
+                  type="file"
+                  multiple
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  onChange={e => handleFpconChange('files', e.target.files)}
+                />
+              </div>
+              {/* Submit Button */}
+              <div className="flex justify-center gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                  disabled={!!fpconDownloadUrl}
+
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  className="px-6 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-medium transition-all duration-200"
+                  onClick={() => { setFpconOpen(false); setFpconDownloadUrl(null); }}
+                >
+                  Cancel
+                </button>
+              </div>
+
+              {fpconDownloadUrl && (
+                <div className="flex justify-center mt-4">
+                  <a
+                    href={fpconDownloadUrl}
+                    download="VFP_Input_Files.zip"
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                    onClick={() => { setFpconOpen(false); setFpconDownloadUrl(null); }}
+                  >
+                    Download VFP Input Files
+                  </a>
+                </div>
+              )}
+
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* Main Content */}
+      < div className="flex lg:flex-row flex-col gap-4 p-4 min-h-screen" >
+        {/* Left Side - Main Content */}
+        < div className="flex-1 lg:w-3/4 space-y-4" >
+          {/* Combined Controls Panel - All in one horizontal line */}
+          {
+            geoFiles.length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-3">
+                <div className="flex flex-wrap items-center gap-6">
+                  {/* 3D Plot File Selection */}
                   <div className="flex items-center gap-3">
-                    <label htmlFor="section-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
-                      Section:
+                    <label htmlFor="geo-file-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
+                      3D Plot File:
                     </label>
                     <select
-                      id="section-select"
-                      onChange={handleSectionChange}
-                      value={selectedSection}
+                      id="geo-file-select"
+                      onChange={handleGeoFileSelection}
+                      value={selectedGeoFile?.id || ''}
                       className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
                     >
-                      {sections.map((section, index) => (
-                        <option key={index} value={index - 1}>
-                          {section}
+                      {geoFiles.map((file) => (
+                        <option key={file.id} value={file.id}>
+                          {file.name}
                         </option>
                       ))}
                     </select>
                   </div>
-                )}
 
-                {/* Planform View Toggle */}
-                {sections.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={planformView}
-                        onChange={handlePlanformToggle}
-                        className="sr-only"
-                      />
-                      <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'
-                        } ${selectedSection !== -1 ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-5' : ''
-                          }`} />
-                      </div>
-                      <span className={`ml-2 text-sm font-medium ${selectedSection !== -1 ? 'text-gray-400' : 'text-gray-700'} whitespace-nowrap`}>
-                        Planform View
-                      </span>
-                    </label>
-                  </div>
-                )}
+                  {/* Section Selection */}
+                  {sections.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <label htmlFor="section-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
+                        Section:
+                      </label>
+                      <select
+                        id="section-select"
+                        onChange={handleSectionChange}
+                        value={selectedSection}
+                        className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                      >
+                        {sections.map((section, index) => (
+                          <option key={index} value={index - 1}>
+                            {section}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                {/* Vertical Separator */}
-                <div className="h-6 w-px bg-gray-300"></div>
-
-                {/* 2D Plot File Visibility Controls */}
-                <div className="flex items-center gap-3">
-                  <label className="font-medium text-gray-700 text-sm whitespace-nowrap">2D Plot Files:</label>
-                  <div className="flex flex-wrap gap-3">
-                    {geoFiles.map(file => (
-                      <label key={file.id} className="flex items-center gap-1 cursor-pointer">
+                  {/* Planform View Toggle */}
+                  {sections.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={visible2DFiles.includes(file.id)}
-                          onChange={() => handle2DVisibilityToggle(file.id)}
-                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1"
+                          checked={planformView}
+                          onChange={handlePlanformToggle}
+                          className="sr-only"
                         />
-                        <span
-                          className="text-sm font-medium"
-                          style={{ color: file.color.primary }}
-                        >
-                          {file.name}
-                          {file.selectedSection >= 0 && ` (S${file.selectedSection + 1})`}
+                        <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'
+                          } ${selectedSection !== -1 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                          <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-5' : ''
+                            }`} />
+                        </div>
+                        <span className={`ml-2 text-sm font-medium ${selectedSection !== -1 ? 'text-gray-400' : 'text-gray-700'} whitespace-nowrap`}>
+                          Planform View
                         </span>
                       </label>
-                    ))}
+                    </div>
+                  )}
+
+                  {/* Vertical Separator */}
+                  <div className="h-6 w-px bg-gray-300"></div>
+
+                  {/* 2D Plot File Visibility Controls */}
+                  <div className="flex items-center gap-3">
+                    <label className="font-medium text-gray-700 text-sm whitespace-nowrap">2D Plot Files:</label>
+                    <div className="flex flex-wrap gap-3">
+                      {geoFiles.map(file => (
+                        <label key={file.id} className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={visible2DFiles.includes(file.id)}
+                            onChange={() => handle2DVisibilityToggle(file.id)}
+                            className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1"
+                          />
+                          <span
+                            className="text-sm font-medium"
+                            style={{ color: file.color.primary }}
+                          >
+                            {file.name}
+                            {file.selectedSection >= 0 && ` (S${file.selectedSection + 1})`}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Another Vertical Separator */}
-                <div className="h-6 w-px bg-gray-300"></div>
+                  {/* Another Vertical Separator */}
+                  <div className="h-6 w-px bg-gray-300"></div>
 
-                {/* 2D Plot Type Selection */}
-                <div className="flex items-center gap-3">
-                  <label className="font-medium text-gray-700 text-sm whitespace-nowrap">Plot Type:</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="plot2d"
-                        value="section"
-                        checked={selected2DPlot === "section"}
-                        onChange={() => setSelected2DPlot("section")}
-                        disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
-                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
-                      />
-                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Section 2D</span>
-                    </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="plot2d"
-                        value="twist"
-                        checked={selected2DPlot === "twist"}
-                        onChange={() => setSelected2DPlot("twist")}
-                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
-                      />
-                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Twist</span>
-                    </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="plot2d"
-                        value="dihedral"
-                        checked={selected2DPlot === "dihedral"}
-                        onChange={() => setSelected2DPlot("dihedral")}
-                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
-                      />
-                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Dihedral</span>
-                    </label>
+                  {/* 2D Plot Type Selection */}
+                  <div className="flex items-center gap-3">
+                    <label className="font-medium text-gray-700 text-sm whitespace-nowrap">Plot Type:</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="plot2d"
+                          value="section"
+                          checked={selected2DPlot === "section"}
+                          onChange={() => setSelected2DPlot("section")}
+                          disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Section 2D</span>
+                      </label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="plot2d"
+                          value="twist"
+                          checked={selected2DPlot === "twist"}
+                          onChange={() => setSelected2DPlot("twist")}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Twist</span>
+                      </label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="plot2d"
+                          value="dihedral"
+                          checked={selected2DPlot === "dihedral"}
+                          onChange={() => setSelected2DPlot("dihedral")}
+                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Dihedral</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          }
           {/* 3D Plot */}
-          {selectedGeoFile && (
-            <div className="bg-white rounded-xl shadow-md p-4">
-              <Plot3D
-                plotData={plot3DTrace()}
-                selectedSection={selectedSection}
-                layout={get3DPlotLayout()}
-              />
-            </div>
-          )}
+          {
+            selectedGeoFile && (
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <Plot3D
+                  plotData={plot3DTrace()}
+                  selectedSection={selectedSection}
+                  layout={get3DPlotLayout()}
+                />
+              </div>
+            )
+          }
 
           {/* 2D Plot */}
-          {geoFiles.length > 0 && visible2DFiles.length > 0 && (
-            <div className="bg-white rounded-xl shadow-md p-4">
-              <Plot2D
-                plotData={plot2DTrace()}
-                selectedSection={selectedSection}
-              />
-            </div>
-          )}
-        </div>
+          {
+            geoFiles.length > 0 && visible2DFiles.length > 0 && (
+              <div className="bg-white rounded-xl shadow-md p-4">
+                <Plot2D
+                  plotData={plot2DTrace()}
+                  selectedSection={selectedSection}
+                />
+              </div>
+            )
+          }
+        </div >
 
         {/* Right Side - Control Panels (Reduced Width) */}
-        <div className="lg:w-1/4 space-y-4">
+        < div className="lg:w-1/4 space-y-4" >
           {/* Wing Specifications Panel */}
-          <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+          < div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300" >
             <div className="p-4">
               <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
                 Wing Specifications
@@ -991,10 +1384,10 @@ function GeometryModule() {
                 </div>
               </div>
             </div>
-          </div>
+          </div >
 
           {/* Improve Sections Panel */}
-          <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+          < div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300" >
             <div className="p-4">
               <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
                 Improve Sections
@@ -1111,10 +1504,10 @@ function GeometryModule() {
                 </button>
               </div>
             </div>
-          </div>
+          </div >
 
           {/* Controls Panel */}
-          <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300">
+          < div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300" >
             <div className="p-4">
               <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
                 Controls
@@ -1180,10 +1573,10 @@ function GeometryModule() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </div >
+        </div >
+      </div >
+    </div >
   );
 }
 
