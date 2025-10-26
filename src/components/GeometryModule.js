@@ -6,15 +6,16 @@ import { fetchAPI } from '../utils/fetch';
 import { Fragment } from 'react';
 
 function GeometryModule() {
-  const [geoFiles, setGeoFiles] = useState([]); // Array to store multiple GEO files
-  const [selectedGeoFile, setSelectedGeoFile] = useState(null); // Currently selected file for 3D view
-  const [visible2DFiles, setVisible2DFiles] = useState([]); // Array of file IDs visible in 2D plots
+  // --- State Definitions ---
+  const [geoFiles, setGeoFiles] = useState([]);
+  const [selectedGeoFile, setSelectedGeoFile] = useState(null);
+  const [visible2DFiles, setVisible2DFiles] = useState([]);
   const [sections, setSections] = useState([]);
   const [selectedSection, setSelectedSection] = useState(-1);
   const [parameters, setParameters] = useState({});
   const [modifiedParameters, setModifiedParameters] = useState({});
   const [selected2DPlot, setSelected2DPlot] = useState("");
-  const [planformView, setPlanformView] = useState(false); // New state for planform view toggle
+  const [planformView, setPlanformView] = useState(false);
   const navigate = useNavigate();
   const [wingSpecs, setWingSpecs] = useState({
     aspectRatio: 0,
@@ -41,12 +42,7 @@ function GeometryModule() {
     files: [],
     clcd_conv: false
   });
-
   const [fpconDownloadUrl, setFpconDownloadUrl] = useState(null);
-
-
-
-  // New state for Improve Panel
   const [improveSettings, setImproveSettings] = useState({
     selectedParameter: 'Twist',
     startSection: 1,
@@ -54,7 +50,13 @@ function GeometryModule() {
     aValue: 0
   });
 
-  // Handle FPCON input changes
+  // --- Side Panel State ---
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(true);
+  const [sidePanelWidth, setSidePanelWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = React.useRef(null);
+
+  // --- FPCON Handlers ---
   const handleFpconChange = (field, value, idx) => {
     if (['etas', 'hsect', 'xtwsec', 'twsin'].includes(field)) {
       setFpconParams(prev => {
@@ -82,7 +84,6 @@ function GeometryModule() {
         ...prev,
         [field]: value
       }));
-      // Update arrays when nsect changes
       if (field === 'nsect') {
         const n = Number(value) || 1;
         setFpconParams(prev => ({
@@ -96,10 +97,8 @@ function GeometryModule() {
     }
   };
 
-  // Update handleFpconSubmit to show download button if success
   const handleFpconSubmit = async (e) => {
     e.preventDefault();
-
     const formData = new FormData();
     formData.append('geoName', fpconParams.geoName);
     formData.append('aspectRatio', fpconParams.aspectRatio);
@@ -135,16 +134,11 @@ function GeometryModule() {
         method: 'POST',
         body: formData
       });
-
-
-      console.log('FPCON response:', response);
-      // If response is a file (zip), create a download URL
       if (response.ok && response.headers.get('content-type')?.includes('application/zip')) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         setFpconDownloadUrl(url);
       } else {
-        // Try to parse error message
         let errorMsg = 'Unknown error';
         try {
           const result = await response.json();
@@ -159,6 +153,7 @@ function GeometryModule() {
     }
   };
 
+  // --- Geometry Calculations ---
   const calculateWingSpecs = (geoData) => {
     if (!geoData || geoData.length === 0) {
       return {
@@ -170,7 +165,7 @@ function GeometryModule() {
     }
     const numSections = geoData.length;
     const lastSection = geoData[geoData.length - 1];
-    const wingSpan = 2 * lastSection.YSECT; // Assuming symmetry
+    const wingSpan = 2 * lastSection.YSECT;
     const tipChord = lastSection.G2SECT - lastSection.G1SECT;
     const taperRatio = tipChord;
     const aspectRatio = (2 * wingSpan) / (1 + taperRatio);
@@ -182,7 +177,7 @@ function GeometryModule() {
     }
   };
 
-  // Color palette for different GEO files
+  // --- Color Palette ---
   const colorPalette = [
     { primary: 'red', secondary: 'blue' },
     { primary: 'green', secondary: 'orange' },
@@ -192,93 +187,70 @@ function GeometryModule() {
     { primary: 'magenta', secondary: 'olive' }
   ];
 
-  // Helper function to remove file extension
-  const removeFileExtension = (filename) => {
-    return filename.replace(/\.[^/.]+$/, "");
-  };
-
+  // --- File Upload Handler ---
+  const removeFileExtension = (filename) => filename.replace(/\.[^/.]+$/, "");
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (!files.length) return;
-
     const formData = new FormData();
     files.forEach(file => {
       formData.append('files', file);
     });
-
     try {
       const response = await fetchAPI('/import-geo', {
         method: 'POST',
         body: formData,
       });
-
       const data = await response.json();
-
       if (data.results) {
         const newGeoFiles = [];
-
         data.results.forEach((result, index) => {
           if (!result.error && result.plotData) {
             const newGeoFile = {
-              id: Date.now() + index, // Unique ID
-              name: removeFileExtension(result.filename), // Remove extension from display name
-              fullName: result.filename, // Keep full filename for reference
+              id: Date.now() + index,
+              name: removeFileExtension(result.filename),
+              fullName: result.filename,
               originalGeoData: result.geoData,
               modifiedGeoData: null,
               originalPlotData: result.plotData,
               modifiedPlotData: null,
               color: colorPalette[(geoFiles.length + index) % colorPalette.length],
-              selectedSection: -1 // Track selected section per file
+              selectedSection: -1
             };
             newGeoFiles.push(newGeoFile);
-          } else {
-            console.error(`Error processing ${result.filename}:`, result.error);
           }
         });
-
         setGeoFiles(prev => [...prev, ...newGeoFiles]);
-
-        // Set first new file as selected for 3D view if no file was previously selected
         if (!selectedGeoFile && newGeoFiles.length > 0) {
           const firstFile = newGeoFiles[0];
           setSelectedGeoFile(firstFile);
           setSections(["3D Wing", ...firstFile.originalGeoData.map((_, i) => `Section ${i + 1}`)]);
           setSelectedSection(-1);
-
-          // Update improve settings with available sections
           setImproveSettings(prev => ({
             ...prev,
             endSection: firstFile.originalGeoData.length
           }));
-
-          // FIX: Update wingSpecs here
           const geoData = firstFile.modifiedGeoData || firstFile.originalGeoData;
           setWingSpecs(calculateWingSpecs(geoData));
         }
-
-
-        // Add all new files to visible 2D files by default
         const newFileIds = newGeoFiles.map(file => file.id);
         setVisible2DFiles(prev => [...prev, ...newFileIds]);
       }
     } catch (error) {
       console.error('Error uploading files:', error);
     }
-
-    // Reset file input
     event.target.value = '';
   };
 
+  // --- Export GEO File Handler ---
   const exportGeoFile = async () => {
     if (!selectedGeoFile) {
       alert('Please select a file first');
       return;
     }
-
     try {
       const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
       const originalFilename = selectedGeoFile.fullName || `${selectedGeoFile.name}.GEO`;
-
       const response = await fetchAPI('/export-geo', {
         method: 'POST',
         headers: {
@@ -289,66 +261,47 @@ function GeometryModule() {
           filename: originalFilename
         }),
       });
-
       if (response.ok) {
-        // Get the filename from response headers or use default
         const contentDisposition = response.headers.get('content-disposition');
         let filename = `${selectedGeoFile.name}_modified.GEO`;
-
         if (contentDisposition && contentDisposition.includes('filename=')) {
           filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
         }
-
-        // Create blob from response
         const blob = await response.blob();
-
-        // Create download link
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
         a.download = filename;
-
-        // Trigger download
         document.body.appendChild(a);
         a.click();
-
-        // Cleanup
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-
-        console.log(`GEO file exported as: ${filename}`);
       } else {
         const errorData = await response.json();
-        console.error('Export failed:', errorData.error);
         alert(`Export failed: ${errorData.error}`);
       }
     } catch (error) {
-      console.error('Error exporting GEO file:', error);
       alert('Error exporting GEO file');
     }
   };
 
+  // --- Selection Handlers ---
   const handleGeoFileSelection = (event) => {
     const fileId = parseInt(event.target.value);
     const selectedFile = geoFiles.find(file => file.id === fileId);
     setSelectedGeoFile(selectedFile);
-
     if (selectedFile) {
       const geoData = selectedFile.modifiedGeoData || selectedFile.originalGeoData;
       setSections(["3D Wing", ...geoData.map((_, i) => `Section ${i + 1}`)]);
       setSelectedSection(selectedFile.selectedSection);
       updateParameters(selectedFile.selectedSection);
-      setModifiedParameters({}); // Clear modified parameters when switching files
-      setWingSpecs(calculateWingSpecs(geoData)); // <-- FIX: update specs here
-
-      // Update improve settings with available sections
+      setModifiedParameters({});
+      setWingSpecs(calculateWingSpecs(geoData));
       setImproveSettings(prev => ({
         ...prev,
         endSection: geoData.length
       }));
-
-      // Reset planform view when switching files
       setPlanformView(false);
     } else {
       setWingSpecs({
@@ -373,14 +326,7 @@ function GeometryModule() {
     setSelectedSection(sectionIndex);
     updateParameters(sectionIndex);
     setSelected2DPlot("");
-    setModifiedParameters({}); // Clear modified parameters when switching sections
-
-    // // Reset planform view when not in 3D Wing mode
-    // if (sectionIndex !== -1) {
-    //   setPlanformView(false);
-    // }
-
-    // Update the selected section for the current file
+    setModifiedParameters({});
     if (selectedGeoFile) {
       setGeoFiles(prev => prev.map(file =>
         file.id === selectedGeoFile.id
@@ -407,7 +353,6 @@ function GeometryModule() {
       });
       return;
     }
-
     const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
     if (geoData && geoData[sectionIndex]) {
       setParameters({
@@ -429,7 +374,6 @@ function GeometryModule() {
     }));
   };
 
-  // New function to handle improve settings change
   const handleImproveSettingsChange = (field, value) => {
     setImproveSettings(prev => ({
       ...prev,
@@ -437,29 +381,23 @@ function GeometryModule() {
     }));
   };
 
-  // New function to perform interpolation
   const performInterpolation = async () => {
     if (!selectedGeoFile) {
       alert('Please select a file first');
       return;
     }
-
     const { selectedParameter, startSection, endSection, aValue } = improveSettings;
-
     if (startSection < 1 || endSection < 1 || startSection > endSection) {
       alert('Please enter valid start and end sections');
       return;
     }
-
+    const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
     const numSections = geoData.length;
-
     if (startSection > numSections || endSection > numSections) {
       alert(`Section numbers must be between 1 and ${numSections}`);
       return;
     }
-
     const numericAValue = typeof aValue === 'number' ? aValue : parseFloat(aValue) || 0;
-
     try {
       const response = await fetchAPI('/interpolate_parameter', {
         method: 'POST',
@@ -468,111 +406,76 @@ function GeometryModule() {
           geoData: geoData,
           plotData: selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData,
           parameter: selectedParameter,
-          startSection: startSection - 1, // Convert to 0-based index
-          endSection: endSection - 1, // Convert to 0-based index
+          startSection: startSection - 1,
+          endSection: endSection - 1,
           aValue: numericAValue
         }),
       });
-
       const { updatedGeoData, updatedPlotData } = await response.json();
-
       if (updatedPlotData) {
-        // Update the selected file with modified data
         setGeoFiles(prev => prev.map(file =>
           file.id === selectedGeoFile.id
             ? { ...file, modifiedGeoData: updatedGeoData, modifiedPlotData: updatedPlotData }
             : file
         ));
-
-        // Update selectedGeoFile reference
         setSelectedGeoFile(prev => ({
           ...prev,
           modifiedGeoData: updatedGeoData,
           modifiedPlotData: updatedPlotData
         }));
         const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
-        setWingSpecs(calculateWingSpecs(geoData)); // <-- FIX: update specs here
-
-
-        // Update parameters if a section is selected
+        setWingSpecs(calculateWingSpecs(geoData));
         if (selectedSection >= 0) {
           updateParameters(selectedSection);
         }
-
-        console.log('Interpolation completed successfully');
       }
     } catch (error) {
-      console.error('Error performing interpolation:', error);
       alert('Error performing interpolation');
     }
   };
 
-  // New function to reset improve changes
   const resetImproveChanges = () => {
     if (!selectedGeoFile) {
       alert('Please select a file first');
       return;
     }
-
-    // Reset the selected file to original data
     setGeoFiles(prev => prev.map(file =>
       file.id === selectedGeoFile.id
         ? { ...file, modifiedGeoData: null, modifiedPlotData: null }
         : file
     ));
-
-    // Update selectedGeoFile reference
     setSelectedGeoFile(prev => ({
       ...prev,
       modifiedGeoData: null,
       modifiedPlotData: null
     }));
-
     const geoData = selectedGeoFile.originalGeoData;
     setWingSpecs(calculateWingSpecs(geoData));
-
-
-    // Update parameters if a section is selected
     if (selectedSection >= 0) {
       updateParameters(selectedSection);
     }
-
-    // Clear modified parameters
     setModifiedParameters({});
-
-    console.log('All changes reset to original data');
   };
 
-  // Function to reset all changes in Controls panel (renamed from compute Global)
   const resetAllChanges = () => {
     if (!selectedGeoFile) {
       alert('Please select a file first');
       return;
     }
-
-    // Reset the selected file to original data
     setGeoFiles(prev => prev.map(file =>
       file.id === selectedGeoFile.id
         ? { ...file, modifiedGeoData: null, modifiedPlotData: null }
         : file
     ));
-
-    // Update selectedGeoFile reference
     setSelectedGeoFile(prev => ({
       ...prev,
       modifiedGeoData: null,
       modifiedPlotData: null
     }));
-
-    // Update parameters if a section is selected
     if (selectedSection >= 0) {
       updateParameters(selectedSection);
     }
-
-    // Clear modified parameters
     setModifiedParameters({});
-
-    console.log('All changes reset to original data');
   };
 
   const computeDesired = async () => {
@@ -584,7 +487,6 @@ function GeometryModule() {
       alert("Please modify at least one parameter before computing");
       return;
     }
-
     try {
       const response = await fetchAPI('/compute_desired', {
         method: 'POST',
@@ -596,37 +498,28 @@ function GeometryModule() {
           plotData: selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData
         }),
       });
-
       const { updatedGeoData, updatedPlotData } = await response.json();
-
       if (updatedPlotData) {
-        // Update the selected file with modified data
         setGeoFiles(prev => prev.map(file =>
           file.id === selectedGeoFile.id
             ? { ...file, modifiedGeoData: updatedGeoData, modifiedPlotData: updatedPlotData }
             : file
         ));
-
-        // Update selectedGeoFile reference
         setSelectedGeoFile(prev => ({
           ...prev,
           modifiedGeoData: updatedGeoData,
           modifiedPlotData: updatedPlotData
         }));
-
-        // Update parameters with new baseline values and clear modified parameters
         updateParameters(selectedSection);
-        setModifiedParameters({}); // Clear modified parameters after successful computation
-        setWingSpecs(calculateWingSpecs(updatedGeoData)); // <-- FIX: update specs here
-
-        console.log('Updated Geo Data:', updatedGeoData);
+        setModifiedParameters({});
+        setWingSpecs(calculateWingSpecs(updatedGeoData));
       }
     } catch (error) {
       console.error('Error computing desired parameters:', error);
     }
   };
 
-  // Get current selection info for header
+  // --- Plot Data ---
   const getSelectionInfo = () => {
     if (!selectedGeoFile || selectedSection === -1) {
       return "No file or section selected";
@@ -634,15 +527,11 @@ function GeometryModule() {
     return `${selectedGeoFile.name} - Section ${selectedSection + 1}`;
   };
 
-  // 3D plot traces (only for selected file)
   const plot3DTrace = () => {
     if (!selectedGeoFile) return [];
-
     const plotData = selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData;
     const color = selectedGeoFile.color;
-
     if (planformView) {
-      // Generate planform view traces (top-down 2D view)
       const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
       return geoData.map((section, index) => ({
         y: [section.G2SECT, section.G1SECT, section.G1SECT, section.G2SECT, section.G2SECT],
@@ -651,12 +540,11 @@ function GeometryModule() {
         mode: 'lines',
         name: `Section ${index + 1}`,
         line: {
-          color: index === 0 ? 'red' : 'black', // Highlight root section
+          color: index === 0 ? 'red' : 'black',
           width: 4
         }
       }));
     } else {
-      // Regular 3D view
       return plotData.flatMap((sectionData, index) => [
         {
           x: sectionData.xus,
@@ -678,10 +566,8 @@ function GeometryModule() {
     }
   };
 
-  // Get plot layout for 3D view
   const get3DPlotLayout = () => {
     if (planformView) {
-      // 2D planform view layout
       return {
         xaxis: {
           title: 'X (Chord Direction)',
@@ -690,7 +576,7 @@ function GeometryModule() {
         yaxis: {
           title: 'Y (Span Direction)',
           showgrid: true,
-          autorange: 'reversed' // Reverse y-axis for correct orientation
+          autorange: 'reversed'
         },
         showlegend: false,
         title: 'Wing Planform View',
@@ -701,7 +587,6 @@ function GeometryModule() {
         font: { family: 'Times New Roman' }
       };
     } else {
-      // Regular 3D layout
       return {
         scene: {
           aspectmode: 'data',
@@ -721,17 +606,14 @@ function GeometryModule() {
     }
   };
 
-  // 2D plot traces (for all visible files)
   const plot2DTrace = () => {
     const visibleFiles = geoFiles.filter(file => visible2DFiles.includes(file.id));
     if (visibleFiles.length === 0) return [];
-
     if (selected2DPlot === "twist") {
       return visibleFiles.flatMap(file => {
         const geoData = file.originalGeoData;
         const modifiedGeoData = file.modifiedGeoData;
         const color = file.color;
-
         const traces = [{
           x: geoData.map((_, i) => i + 1),
           y: geoData.map(section => section.TWIST),
@@ -740,7 +622,6 @@ function GeometryModule() {
           name: `${file.name} - Original Twist`,
           line: { color: color.primary }
         }];
-
         if (modifiedGeoData) {
           traces.push({
             x: modifiedGeoData.map((_, i) => i + 1),
@@ -751,17 +632,14 @@ function GeometryModule() {
             line: { color: color.primary, dash: 'dash' }
           });
         }
-
         return traces;
       });
     }
-
     if (selected2DPlot === "dihedral") {
       return visibleFiles.flatMap(file => {
         const geoData = file.originalGeoData;
         const modifiedGeoData = file.modifiedGeoData;
         const color = file.color;
-
         const traces = [{
           x: geoData.map((_, i) => i + 1),
           y: geoData.map(section => section.HSECT),
@@ -770,7 +648,6 @@ function GeometryModule() {
           name: `${file.name} - Original Dihedral`,
           line: { color: color.secondary }
         }];
-
         if (modifiedGeoData) {
           traces.push({
             x: modifiedGeoData.map((_, i) => i + 1),
@@ -781,24 +658,17 @@ function GeometryModule() {
             line: { color: color.secondary, dash: 'dash' }
           });
         }
-
         return traces;
       });
     }
-
     if (selected2DPlot === "section") {
       return visibleFiles.flatMap(file => {
         const sectionIndex = file.selectedSection;
-
-        // Skip if no valid section selected for this file
         if (sectionIndex < 0) return [];
-
         const plotData = file.originalPlotData;
         const modifiedPlotData = file.modifiedPlotData;
         const color = file.color;
-
         if (!plotData[sectionIndex]) return [];
-
         const sectionData = plotData[sectionIndex];
         const traces = [
           {
@@ -818,7 +688,6 @@ function GeometryModule() {
             line: { 'color': color.secondary, 'width': 3 }
           }
         ];
-
         if (modifiedPlotData && modifiedPlotData[sectionIndex]) {
           const newsectionData = modifiedPlotData[sectionIndex];
           if (newsectionData.xus_n && newsectionData.zus_n) {
@@ -845,71 +714,115 @@ function GeometryModule() {
         return traces;
       });
     }
-
     return [];
   };
 
-  // Generate section options for dropdowns
   const getSectionOptions = () => {
     if (!selectedGeoFile) return [];
     const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
     return geoData.map((_, index) => index + 1);
   };
 
+  // --- Resize Handlers for Side Panel ---
+  const handleMouseDown = React.useCallback((e) => {
+    setIsResizing(true);
+    e.preventDefault();
+  }, []);
+
+  const handleMouseMove = React.useCallback((e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX;
+    if (newWidth >= 200 && newWidth <= 600) {
+      setSidePanelWidth(newWidth);
+    }
+  }, [isResizing]);
+
+  const handleMouseUp = React.useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+
+  // --- MAIN RETURN ---
   return (
-    <div className="min-h-screen bg-gray-100 font-serif">
+    <div className="h-screen w-screen flex flex-col bg-blue-50 font-sans">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="px-8 py-4 flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <button
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
-              onClick={() => navigate('/')}
-            >
-              Back to Main Module
-            </button>
-            <button
-              className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md"
-              onClick={() => setFpconOpen(true)}
-            >
-              FPCON
-            </button>
-            <div className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md cursor-pointer">
-              <input
-                type="file"
-                accept=".GEO"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-                id="fileInput"
-                multiple
-              />
-              <label
-                className="cursor-pointer"
-                onClick={() => document.getElementById('fileInput').click()}
-              >
-                Import file
-              </label>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            <button
-              className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md"
-              onClick={exportGeoFile}
-            >
-              Export GEO file
-            </button>
-            <button className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md">
-              Save plots
-            </button>
-            <button
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
-              onClick={() => window.location.reload(false)}
-            >
-              Reset
-            </button>
-          </div>
+      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-blue-200 shadow-sm">
+        <div className="flex items-center space-x-4">
+          <button
+            className="p-2 hover:bg-blue-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
+            title={isSidePanelOpen ? 'Hide side panel' : 'Show side panel'}
+          >
+            <svg className={`w-5 h-5 text-blue-600 transition-transform duration-200 ${isSidePanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          <h1 className="text-xl font-semibold text-gray-800">Geometry Module</h1>
         </div>
-      </header >
+        <div className="flex items-center space-x-3">
+          <button
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            onClick={() => navigate('/')}
+          >
+            Back to Main Module
+          </button>
+          <button
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md"
+            onClick={() => setFpconOpen(true)}
+          >
+            FPCON
+          </button>
+          <div className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md cursor-pointer">
+            <input
+              type="file"
+              accept=".GEO"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+              id="fileInput"
+              multiple
+            />
+            <label
+              className="cursor-pointer"
+              onClick={() => document.getElementById('fileInput').click()}
+            >
+              Import Geometry
+            </label>
+          </div>
+          <button
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300 rounded-lg font-medium transition-all duration-200 hover:shadow-md"
+            onClick={exportGeoFile}
+          >
+            Export GEO file
+          </button>
+          <button
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+            onClick={() => window.location.reload(false)}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
       {/* FPCON Modal */}
       {fpconOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -1166,185 +1079,17 @@ function GeometryModule() {
       )}
 
 
-      {/* Main Content */}
-      < div className="flex lg:flex-row flex-col gap-4 p-4 min-h-screen" >
-        {/* Left Side - Main Content */}
-        < div className="flex-1 lg:w-3/4 space-y-4" >
-          {/* Combined Controls Panel - All in one horizontal line */}
-          {
-            geoFiles.length > 0 && (
-              <div className="bg-white rounded-xl shadow-md p-3">
-                <div className="flex flex-wrap items-center gap-6">
-                  {/* 3D Plot File Selection */}
-                  <div className="flex items-center gap-3">
-                    <label htmlFor="geo-file-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
-                      3D Plot File:
-                    </label>
-                    <select
-                      id="geo-file-select"
-                      onChange={handleGeoFileSelection}
-                      value={selectedGeoFile?.id || ''}
-                      className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                    >
-                      {geoFiles.map((file) => (
-                        <option key={file.id} value={file.id}>
-                          {file.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
-                  {/* Section Selection */}
-                  {sections.length > 0 && (
-                    <div className="flex items-center gap-3">
-                      <label htmlFor="section-select" className="font-medium text-gray-700 text-sm whitespace-nowrap">
-                        Section:
-                      </label>
-                      <select
-                        id="section-select"
-                        onChange={handleSectionChange}
-                        value={selectedSection}
-                        className="px-2 py-1 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                      >
-                        {sections.map((section, index) => (
-                          <option key={index} value={index - 1}>
-                            {section}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Planform View Toggle */}
-                  {sections.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={planformView}
-                          onChange={handlePlanformToggle}
-                          className="sr-only"
-                        />
-                        <div className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'
-                          } ${selectedSection !== -1 ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                          <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-5' : ''
-                            }`} />
-                        </div>
-                        <span className={`ml-2 text-sm font-medium ${selectedSection !== -1 ? 'text-gray-400' : 'text-gray-700'} whitespace-nowrap`}>
-                          Planform View
-                        </span>
-                      </label>
-                    </div>
-                  )}
-
-                  {/* Vertical Separator */}
-                  <div className="h-6 w-px bg-gray-300"></div>
-
-                  {/* 2D Plot File Visibility Controls */}
-                  <div className="flex items-center gap-3">
-                    <label className="font-medium text-gray-700 text-sm whitespace-nowrap">2D Plot Files:</label>
-                    <div className="flex flex-wrap gap-3">
-                      {geoFiles.map(file => (
-                        <label key={file.id} className="flex items-center gap-1 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={visible2DFiles.includes(file.id)}
-                            onChange={() => handle2DVisibilityToggle(file.id)}
-                            className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1"
-                          />
-                          <span
-                            className="text-sm font-medium"
-                            style={{ color: file.color.primary }}
-                          >
-                            {file.name}
-                            {file.selectedSection >= 0 && ` (S${file.selectedSection + 1})`}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Another Vertical Separator */}
-                  <div className="h-6 w-px bg-gray-300"></div>
-
-                  {/* 2D Plot Type Selection */}
-                  <div className="flex items-center gap-3">
-                    <label className="font-medium text-gray-700 text-sm whitespace-nowrap">Plot Type:</label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="plot2d"
-                          value="section"
-                          checked={selected2DPlot === "section"}
-                          onChange={() => setSelected2DPlot("section")}
-                          disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
-                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
-                        />
-                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Section 2D</span>
-                      </label>
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="plot2d"
-                          value="twist"
-                          checked={selected2DPlot === "twist"}
-                          onChange={() => setSelected2DPlot("twist")}
-                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
-                        />
-                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Twist</span>
-                      </label>
-                      <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="plot2d"
-                          value="dihedral"
-                          checked={selected2DPlot === "dihedral"}
-                          onChange={() => setSelected2DPlot("dihedral")}
-                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
-                        />
-                        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Dihedral</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          }
-          {/* 3D Plot */}
-          {
-            selectedGeoFile && (
-              <div className="bg-white rounded-xl shadow-md p-4">
-                <Plot3D
-                  plotData={plot3DTrace()}
-                  selectedSection={selectedSection}
-                  layout={get3DPlotLayout()}
-                />
-              </div>
-            )
-          }
-
-          {/* 2D Plot */}
-          {
-            geoFiles.length > 0 && visible2DFiles.length > 0 && (
-              <div className="bg-white rounded-xl shadow-md p-4">
-                <Plot2D
-                  plotData={plot2DTrace()}
-                  selectedSection={selectedSection}
-                />
-              </div>
-            )
-          }
-        </div >
-
-        {/* Right Side - Control Panels (Reduced Width) */}
-        < div className="lg:w-1/4 space-y-4" >
-          {/* Wing Specifications Panel */}
-          < div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300" >
-            <div className="p-4">
-              <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
-                Wing Specifications
-              </h2>
+      <div className="flex flex-1 overflow-hidden relative h-full w-full">
+        {/* Side Panel */}
+        <div
+          className={`bg-white border-r border-blue-200 transition-all duration-300 absolute top-0 left-0 h-full z-10 ${isSidePanelOpen ? '' : 'w-0'} overflow-auto`}
+          style={{ width: isSidePanelOpen ? `${sidePanelWidth}px` : '0px', minWidth: isSidePanelOpen ? `${sidePanelWidth}px` : '0px' }}
+        >
+          <div className="h-full flex flex-col">
+            {/* Wing Specifications */}
+            <div className="p-4 border-b border-blue-200 bg-blue-50">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Wing Specifications</h3>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-2">
                   <label className="text-xs font-medium text-gray-600">Aspect Ratio</label>
@@ -1384,16 +1129,9 @@ function GeometryModule() {
                 </div>
               </div>
             </div>
-          </div >
-
-          {/* Improve Sections Panel */}
-          < div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300" >
-            <div className="p-4">
-              <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
-                Improve Sections
-              </h2>
-
-              {/* Parameter Selection */}
+            {/* Improve Panel */}
+            <div className="p-4 border-b border-blue-200 bg-blue-50">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Improve Sections</h3>
               <div className="mb-4">
                 <div className="bg-white border border-gray-200 rounded-lg p-2">
                   <div className="flex flex-col gap-2">
@@ -1433,8 +1171,6 @@ function GeometryModule() {
                   </div>
                 </div>
               </div>
-
-              {/* Section Range Selection */}
               <div className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
                 <div className="mb-3">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Sections:</label>
@@ -1466,13 +1202,9 @@ function GeometryModule() {
                     </select>
                   </div>
                 </div>
-
-                {/* Formula Display */}
                 <div className="text-center mb-3 p-2 bg-gray-50 border border-gray-200 rounded-md">
                   <span className="font-mono text-xs text-gray-600 font-medium">(y = ax² + bx + c)</span>
                 </div>
-
-                {/* A Value Input */}
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700">a =</label>
                   <input
@@ -1485,8 +1217,6 @@ function GeometryModule() {
                   />
                 </div>
               </div>
-
-              {/* Improve and Reset Controls */}
               <div className="flex justify-center gap-2">
                 <button
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
@@ -1504,23 +1234,14 @@ function GeometryModule() {
                 </button>
               </div>
             </div>
-          </div >
-
-          {/* Controls Panel */}
-          < div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-300" >
-            <div className="p-4">
-              <h2 className="text-lg font-bold text-blue-700 text-center mb-4 tracking-wide">
-                Controls
-              </h2>
-
-              {/* Selection Info Header */}
+            {/* Controls Panel */}
+            <div className="p-4 flex-1">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Controls</h3>
               <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-600 rounded-md">
                 <h3 className="text-sm font-semibold text-blue-700 text-center">
                   {getSelectionInfo()}
                 </h3>
               </div>
-
-              {/* Parameters Table */}
               <div className="overflow-x-auto mb-4">
                 <table className="w-full">
                   <thead>
@@ -1555,8 +1276,6 @@ function GeometryModule() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Action Buttons */}
               <div className="flex justify-center gap-2">
                 <button
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
@@ -1573,11 +1292,207 @@ function GeometryModule() {
                 </button>
               </div>
             </div>
-          </div >
-        </div >
-      </div >
-    </div >
+          </div>
+          {/* Resize Handle */}
+          {isSidePanelOpen && (
+            <div
+              ref={resizeRef}
+              className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 transition-colors duration-200 ${isResizing ? 'bg-blue-400' : 'bg-blue-200'}`}
+              onMouseDown={handleMouseDown}
+            />
+          )}
+        </div>
+
+        {/* Main Plot Canvas */}
+        <div
+          className="flex-1 flex flex-col relative h-full"
+          style={{
+            marginLeft: isSidePanelOpen ? `${sidePanelWidth}px` : '0px',
+            marginRight: '320px',
+            transition: 'margin-left 0.3s, margin-right 0.3s',
+            height: '100%',
+            minHeight: 0,
+          }}
+        >
+          <div className="flex-1 flex flex-col bg-blue-50 h-full min-h-0">
+            <div className="flex-1 min-h-0">
+              {selectedGeoFile ? (
+                <Plot3D
+                  plotData={plot3DTrace()}
+                  selectedSection={selectedSection}
+                  layout={{
+                    ...get3DPlotLayout(),
+                    paper_bgcolor: '#f9fafb',
+                    plot_bgcolor: '#f9fafb'
+                  }}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              ) : (
+                <div className="h-full bg-blue-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-blue-400 mb-3">
+                      <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 font-medium">Import a GEO file to display plots</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-h-0">
+              {geoFiles.length > 0 && visible2DFiles.length > 0 && (
+                <Plot2D
+                  plotData={plot2DTrace()}
+                  selectedSection={selectedSection}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Plot Options Panel */}
+        <div
+          className="bg-white border-l border-blue-200 flex flex-col overflow-y-auto absolute top-0 right-0 h-full z-10"
+          style={{ width: '320px', minWidth: '320px' }}
+        >
+          <div className="p-4 border-b border-blue-200 bg-blue-50">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Plot Options</h3>
+            {geoFiles.length > 0 && (
+              <div className="space-y-6">
+                {/* 3D Plot File Selection */}
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="geo-file-select" className="font-medium text-gray-700 text-sm">
+                    <span className="inline-block mb-1">3D Plot File:</span>
+                  </label>
+                  <select
+                    id="geo-file-select"
+                    onChange={handleGeoFileSelection}
+                    value={selectedGeoFile?.id || ''}
+                    className="px-3 py-2 border border-blue-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm shadow-sm"
+                  >
+                    {geoFiles.map((file) => (
+                      <option key={file.id} value={file.id}>
+                        {file.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* Section Selection */}
+                {sections.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <label htmlFor="section-select" className="font-medium text-gray-700 text-sm">
+                      <span className="inline-block mb-1">Section:</span>
+                    </label>
+                    <select
+                      id="section-select"
+                      onChange={handleSectionChange}
+                      value={selectedSection}
+                      className="px-3 py-2 border border-blue-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm shadow-sm"
+                    >
+                      {sections.map((section, index) => (
+                        <option key={index} value={index - 1}>
+                          {section}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {/* Planform View Toggle */}
+                {sections.length > 0 && (
+                  <div className="flex items-center gap-3 mt-2">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={planformView}
+                        onChange={handlePlanformToggle}
+                        className="sr-only"
+                      />
+                      <div className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'
+                        } ${selectedSection !== -1 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-6' : ''
+                          }`} />
+                      </div>
+                      <span className={`ml-3 text-sm font-medium ${selectedSection !== -1 ? 'text-gray-400' : 'text-gray-700'} whitespace-nowrap`}>
+                        Planform View
+                      </span>
+                    </label>
+                  </div>
+                )}
+                {/* 2D Plot File Visibility Controls */}
+                <div className="flex flex-col gap-2 mt-2">
+                  <label className="font-medium text-gray-700 text-sm mb-1">2D Plot Files:</label>
+                  <div className="flex flex-wrap gap-2">
+                    {geoFiles.map(file => (
+                      <label key={file.id} className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-blue-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={visible2DFiles.includes(file.id)}
+                          onChange={() => handle2DVisibilityToggle(file.id)}
+                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1"
+                        />
+                        <span
+                          className="text-sm font-semibold"
+                          style={{ color: file.color.primary }}
+                        >
+                          {file.name}
+                          {file.selectedSection >= 0 && <span className="ml-1 text-xs text-gray-500">({`S${file.selectedSection + 1}`})</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {/* 2D Plot Type Selection */}
+                <div className="flex flex-col gap-2 mt-2">
+                  <label className="font-medium text-gray-700 text-sm mb-1">Plot Type:</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="plot2d"
+                        value="section"
+                        checked={selected2DPlot === "section"}
+                        onChange={() => setSelected2DPlot("section")}
+                        disabled={!geoFiles.some(file => visible2DFiles.includes(file.id) && file.selectedSection >= 0)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                      />
+                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Section 2D</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="plot2d"
+                        value="twist"
+                        checked={selected2DPlot === "twist"}
+                        onChange={() => setSelected2DPlot("twist")}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                      />
+                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Twist</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="plot2d"
+                        value="dihedral"
+                        checked={selected2DPlot === "dihedral"}
+                        onChange={() => setSelected2DPlot("dihedral")}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-1"
+                      />
+                      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Dihedral</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
   );
+
+
 }
 
 export default GeometryModule;

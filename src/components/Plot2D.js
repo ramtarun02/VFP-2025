@@ -14,7 +14,7 @@ function Plot2D({ plotData, selectedSection }) {
     margin: { l: 60, r: 30, b: 50, t: 50 },
     legend: { orientation: 'h', y: -0.2 },
     autosize: true,
-    height: 350,
+    height: undefined,
   };
 
   return (
@@ -22,7 +22,7 @@ function Plot2D({ plotData, selectedSection }) {
       data={plotData}
       layout={layout}
       config={{ responsive: true }}
-      style={{ width: '100%', height: '25%', marginTop: '1rem' }}
+      style={{ width: '100%', height: '100%', marginTop: '1rem' }}
     />
   );
 }

@@ -32,7 +32,7 @@ const Plot3D = ({ plotData, selectedSection, layout }) => {
         layout={finalLayout}
         useResizeHandler={true}
         config={{ responsive: true }}
-        style={{ width: '100%', height: '32vh' }}
+        style={{ width: '100%', height: '100%' }}
       />
     </>
   );
