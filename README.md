@@ -1,69 +1,120 @@
-# Getting Started with Viscous Full Potential Solver
+# Viscous Full Potential Flow Solver
 
+## Overview 
 
-## Available Scripts
+The VFP (Viscous Full Potential) Web Application is a modern, browser-based computational fluid dynamics (CFD) tool designed for conceptual aircraft design. This application replaces the legacy MATLAB-based GUI with a scalable, cross-platform web solution built using ReactJS for the frontend and Python for the backend server. The VFP (Viscous Full Potential) Web Application is a modern, browser-based computational fluid dynamics (CFD) tool designed for transonic aircraft design. This application replaces the legacy MATLAB-based GUI with a scalable, cross-platform web solution built using ReactJS for the frontend and Python for the backend server.
 
-In the project directory, you can run:
+## Purpose 
 
-### `npm start`
+The VFP Web Application aims to:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- Provides an efficient and interactive graphical user interface for the legacy VFP CLI developed by ESDU.
+- Enable efficient geometry visualisation, modifications and performance evaluations
+- Supports Generation of VFP Input Files by integrated FPCON
+- Auto Runner -- Enables Users to simulate continuation run through a range og angle of attacks.
+- Facilitate multi-user, collaborative workflows through web-based access
+- Support integration of propeller-wing interference modeling (ProWIM)
+- Eliminate platform dependencies (Windows-only constraint of the original MATLAB/Fortran implementation)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Target Audience
 
-### `npm test`
+This application is designed for:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Aerospace engineers** conducting conceptual/preliminary aircraft design
+- **Researchers** studying potential flows and boundary layer.
+- **Students** learning CFD and aircraft design principles
+- **Design teams** requiring collaborative and rapid aerodynamic analysis tools
 
-### `npm run build`
+## Key Advantages over Legacy VFP CLI/MATLAB GUI
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Provides an efficient and interactive graphical user interface for the legacy VFP CLI developed by ESDU.
+- Enable efficient geometry visualisation, modifications and performance evaluations
+- **Integrated FPCON**: Supports Generation of VFP Input Files by integrated ESDU's FPCON
+- **Auto Runner** -- Enables Users to simulate continuation run through a range of angle of attacks.
+- **Cross-platform accessibility**: Works on Windows, macOS, and Linux via web browser
+- **Multi-user support**: Enables simultaneous access by multiple team members
+- **Improved performance**: Enhanced responsiveness and computational efficiency
+- **Modern UI/UX**: Intuitive interface with contemporary design patterns
+- **No licensing costs**: Open-source technology stack eliminates proprietary software fees
+- **Cloud deployment ready**: Can be hosted on institutional or cloud servers
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+# Getting Started
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Welcome to the Aircraft Design and Optimization Tool! This guide will help you set up and start using the application, even if you have limited experience with software installation.
 
-### `npm run eject`
+## System Requirements
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+**Minimum Requirements:**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- **Modern web browser (Chrome, Firefox, Safari, Edge)**
+- **Internet connection (for web-hosted deployment)**
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+**For Local Installation:**
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- **Frontend: Node.js 16.x or higher, npm 7.x or higher**
+- **Backend: Python 3.8 or higher, pip package manager**
+- **Operating System: Windows 10/11, macOS 10.15+, or Linux (Ubuntu 20.04+)**
+- **RAM: 4GB minimum, 8GB recommended**
+- **Disk Space: 2GB free space**
 
-## Learn More
+## Installation
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### 2.2.1 Accessing the Web Application (End Users)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+If your institution hosts the VFP Web Application, simply navigate to the provided URL in your web browser. No local installation is required.
 
-### Code Splitting
+**Example URL:** https://vfp.university.edu or http://localhost:3000 (for local deployment)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### 2.2.2 Local Installation (Developers/Administrators)
 
-### Analyzing the Bundle Size
+**Step 1: Clone the Repository**
+```bash
+git clone https://github.com/your-org/vfp-web-app.git
+cd vfp-web-app
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+**Step 2: Backend Setup**
+```bash
+# Navigate to backend directory
+cd backend
 
-### Making a Progressive Web App
+# Create virtual environment
+python -m venv venv
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
 
-### Advanced Configuration
+# Install dependencies
+pip install -r requirements.txt
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+**Step 3: Frontend Setup**
+```bash
+# Navigate to frontend directory (from project root)
+cd frontend
 
-### Deployment
+# Install dependencies
+npm install
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## 2.3 Starting the Application
 
-### `npm run build` fails to minify
+**Step 1: Start the Backend Server**
+```bash
+cd backend
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+python app.py
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The backend server will start on http://localhost:5000
+
+**Step 2: Start the Frontend Development Server**
+In the frontend folder, run 
+```bash 
+npm start
+```
+
+The VFP Application will open in a new browser window/tab with an URL http://localhost:3000
