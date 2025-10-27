@@ -51,6 +51,7 @@ Welcome to the Aircraft Design and Optimization Tool! This guide will help you s
 
 **For Local Installation:**
 
+- **Git**
 - **Frontend: Node.js 16.x or higher, npm 7.x or higher**
 - **Backend: Python 3.8 or higher, pip package manager**
 - **Operating System: Windows 10/11, macOS 10.15+, or Linux (Ubuntu 20.04+)**
@@ -61,22 +62,24 @@ Welcome to the Aircraft Design and Optimization Tool! This guide will help you s
 
 ### 2.2.1 Accessing the Web Application (End Users)
 
-If your institution hosts the VFP Web Application, simply navigate to the provided URL in your web browser. No local installation is required.
+The application is deployed online via GitHub Pages. To access the VFP Web Application, simply navigate to the following URL in your web browser—no local installation required.
 
-**Example URL:** https://vfp.university.edu or http://localhost:3000 (for local deployment)
+**VFP Application URL:** [https://ramtarun02.github.io/VFP-2025](https://ramtarun02.github.io/VFP-2025)
 
 ### 2.2.2 Local Installation (Developers/Administrators)
 
-**Step 1: Clone the Repository**
+#### Step 1: Clone the Frontend Repository
 ```bash
-git clone https://github.com/your-org/vfp-web-app.git
-cd vfp-web-app
+git clone https://github.com/ramtarun02/VFP-2025.git
+cd VFP-2025
 ```
 
-**Step 2: Backend Setup**
+#### Step 2: Clone and Set Up the Backend Server
+The backend server is now maintained in a separate repository. Clone and set up the backend as follows:
+
 ```bash
-# Navigate to backend directory
-cd backend
+git clone https://github.com/ramtarun02/VFP-Python.git
+cd VFP-Python
 
 # Create virtual environment
 python -m venv venv
@@ -91,10 +94,10 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Step 3: Frontend Setup**
+#### Step 3: Frontend Setup
 ```bash
 # Navigate to frontend directory (from project root)
-cd frontend
+cd ../VFP-2025
 
 # Install dependencies
 npm install
@@ -104,9 +107,19 @@ npm install
 
 **Step 1: Start the Backend Server**
 ```bash
-cd backend
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-python app.py
+cd VFP-Python
+# Activate virtual environment
+venv\Scripts\activate  # On Windows
+# or
+source venv/bin/activate  # On macOS/Linux
+
+# Set Flask app environment variable
+set FLASK_APP=src/app.py        # On Windows
+# or
+export FLASK_APP=src/app.py     # On macOS/Linux
+
+# Start the Flask development server
+flask run
 ```
 
 The backend server will start on http://localhost:5000
