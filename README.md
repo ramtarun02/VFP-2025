@@ -73,8 +73,16 @@ The application is deployed online via GitHub Pages. To access the VFP Web Appli
 git clone https://github.com/ramtarun02/VFP-2025.git
 cd VFP-2025
 ```
+#### Step 2: Frontend Setup
+```bash
+# Navigate to frontend directory (from project root)
+cd VFP-2025
 
-#### Step 2: Clone and Set Up the Backend Server
+# Install dependencies
+npm install
+```
+
+#### Step 3: Clone and Set Up the Backend Server
 The backend server is now maintained in a separate repository. Clone and set up the backend as follows:
 
 ```bash
@@ -84,7 +92,7 @@ cd VFP-Python
 # Create virtual environment
 python -m venv venv
 
-# Activate virtual environment
+# Activate virtual environment (Make Sure the venv is activated everytime you start the backend server)
 # On Windows:
 venv\Scripts\activate
 # On macOS/Linux:
@@ -92,15 +100,6 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-```
-
-#### Step 3: Frontend Setup
-```bash
-# Navigate to frontend directory (from project root)
-cd ../VFP-2025
-
-# Install dependencies
-npm install
 ```
 
 ## 2.3 Starting the Application
@@ -113,7 +112,7 @@ venv\Scripts\activate  # On Windows
 # or
 source venv/bin/activate  # On macOS/Linux
 
-# Set Flask app environment variable
+# Set Flask app environment variable (Only Needed when setting up for the first time)
 set FLASK_APP=src/app.py        # On Windows
 # or
 export FLASK_APP=src/app.py     # On macOS/Linux
@@ -125,9 +124,9 @@ flask run
 The backend server will start on http://localhost:5000
 
 **Step 2: Start the Frontend Development Server**
-In the frontend folder, run 
+In the frontend folder (VFP-2025), run 
 ```bash 
-npm start
+npm run dev
 ```
 
 The VFP Application will open in a new browser window/tab with an URL http://localhost:3000
