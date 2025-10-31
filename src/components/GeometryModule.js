@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Plot3D from './Plot3D';
 import Plot2D from './Plot2D';
 import { useNavigate } from "react-router-dom";
@@ -21,7 +21,8 @@ function GeometryModule() {
     aspectRatio: 0,
     wingSpan: 0,
     numSections: 0,
-    taperRatio: 0
+    taperRatio: 0,
+    wingArea: 0
   });
   const [fpconOpen, setFpconOpen] = useState(false);
   const [fpconParams, setFpconParams] = useState({
@@ -160,7 +161,8 @@ function GeometryModule() {
         aspectRatio: 0,
         wingSpan: 0,
         numSections: 0,
-        taperRatio: 0
+        taperRatio: 0,
+        wingArea: 0
       };
     }
     const numSections = geoData.length;
@@ -168,12 +170,39 @@ function GeometryModule() {
     const wingSpan = 2 * lastSection.YSECT;
     const tipChord = lastSection.G2SECT - lastSection.G1SECT;
     const taperRatio = tipChord;
-    const aspectRatio = (2 * wingSpan) / (1 + taperRatio);
+
+    // Calculate chords and y positions
+    const chords = geoData.map(section => section.G2SECT - section.G1SECT);
+    const ysects = geoData.map(section => section.YSECT);
+
+    let wingArea = 0;
+    if (geoData.length % 2 === 1 || geoData.length < 12) {
+      // Trapezoidal rule for odd number of sections
+      for (let i = 1; i < geoData.length; i++) {
+        wingArea += (ysects[i] - ysects[i - 1]) * (chords[i] + chords[i - 1]) / 2;
+      }
+    } else {
+      // Simpson's rule for even number of sections
+      // Assumes ysects are equally spaced
+      const n = geoData.length - 1;
+      const h = (ysects[n] - ysects[0]) / n;
+      let sum = chords[0] + chords[n];
+      for (let i = 1; i < n; i++) {
+        sum += (i % 2 === 0 ? 2 : 4) * chords[i];
+      }
+      wingArea = (h / 3) * sum;
+    }
+    wingArea *= 2; // For both sides of the wing
+
+    const aspectRatio = wingSpan ** 2 / wingArea;
+
+
     return {
-      aspectRatio: aspectRatio.toFixed(2),
-      wingSpan: wingSpan.toFixed(3),
+      aspectRatio: aspectRatio.toFixed(5),
+      wingSpan: wingSpan.toFixed(5),
       numSections: numSections,
-      taperRatio: taperRatio.toFixed(2)
+      taperRatio: taperRatio.toFixed(5),
+      wingArea: wingArea.toFixed(5)
     }
   };
 
@@ -472,11 +501,31 @@ function GeometryModule() {
       modifiedGeoData: null,
       modifiedPlotData: null
     }));
+    const geoData = selectedGeoFile.originalGeoData;
+    setWingSpecs(calculateWingSpecs(geoData));
     if (selectedSection >= 0) {
-      updateParameters(selectedSection);
+      if (geoData && geoData[selectedSection]) {
+        setParameters({
+          Twist: geoData[selectedSection].TWIST,
+          Dihedral: geoData[selectedSection].HSECT,
+          YSECT: geoData[selectedSection].YSECT,
+          XLE: geoData[selectedSection].G1SECT,
+          XTE: geoData[selectedSection].G2SECT,
+          Chord: (geoData[selectedSection].G2SECT - geoData[selectedSection].G1SECT),
+
+        })
+      }
     }
     setModifiedParameters({});
   };
+
+
+  useEffect(() => {
+    if (selectedGeoFile && selectedSection >= 0) {
+      updateParameters(selectedSection);
+    }
+  }, [selectedGeoFile?.modifiedGeoData, selectedSection]);
+
 
   const computeDesired = async () => {
     if (!selectedGeoFile || selectedSection === null || selectedSection === undefined) {
@@ -486,6 +535,20 @@ function GeometryModule() {
     if (Object.keys(modifiedParameters).length === 0) {
       alert("Please modify at least one parameter before computing");
       return;
+    }
+
+    // Log which data is being sent
+    const geoDataToSend = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
+    const plotDataToSend = selectedGeoFile.modifiedPlotData || selectedGeoFile.originalPlotData;
+    if (selectedGeoFile.modifiedGeoData) {
+      console.log("Sending MODIFIED geoData to backend for compute_desired.");
+    } else {
+      console.log("Sending ORIGINAL geoData to backend for compute_desired.");
+    }
+    if (selectedGeoFile.modifiedPlotData) {
+      console.log("Sending MODIFIED plotData to backend for compute_desired.");
+    } else {
+      console.log("Sending ORIGINAL plotData to backend for compute_desired.");
     }
     try {
       const response = await fetchAPI('/compute_desired', {
@@ -513,6 +576,8 @@ function GeometryModule() {
         updateParameters(selectedSection);
         setModifiedParameters({});
         setWingSpecs(calculateWingSpecs(updatedGeoData));
+        console.log('Updated plot data received:', updatedPlotData);
+        console.log('Updated geo data received:', updatedGeoData);
       }
     } catch (error) {
       console.error('Error computing desired parameters:', error);
@@ -533,7 +598,8 @@ function GeometryModule() {
     const color = selectedGeoFile.color;
     if (planformView) {
       const geoData = selectedGeoFile.modifiedGeoData || selectedGeoFile.originalGeoData;
-      return geoData.map((section, index) => ({
+      // Main planform rectangles
+      const traces = geoData.map((section, index) => ({
         y: [section.G2SECT, section.G1SECT, section.G1SECT, section.G2SECT, section.G2SECT],
         x: [section.YSECT, section.YSECT, section.YSECT, section.YSECT, section.YSECT],
         type: 'scatter',
@@ -544,6 +610,36 @@ function GeometryModule() {
           width: 4
         }
       }));
+
+      // Dashed line: Leading edge (G1SECT) of all sections
+      const leadingEdgeTrace = {
+        x: geoData.map(section => section.YSECT),
+        y: geoData.map(section => section.G1SECT),
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Leading Edge',
+        line: {
+          color: 'green',
+          width: 2,
+          dash: 'dash'
+        }
+      };
+
+      // Dashed line: Trailing edge (G2SECT) of all sections
+      const trailingEdgeTrace = {
+        x: geoData.map(section => section.YSECT),
+        y: geoData.map(section => section.G2SECT),
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Trailing Edge',
+        line: {
+          color: 'blue',
+          width: 2,
+          dash: 'dash'
+        }
+      };
+
+      return [...traces, leadingEdgeTrace, trailingEdgeTrace];
     } else {
       return plotData.flatMap((sectionData, index) => [
         {
@@ -565,6 +661,7 @@ function GeometryModule() {
       ]);
     }
   };
+
 
   const get3DPlotLayout = () => {
     if (planformView) {
@@ -690,7 +787,7 @@ function GeometryModule() {
         ];
         if (modifiedPlotData && modifiedPlotData[sectionIndex]) {
           const newsectionData = modifiedPlotData[sectionIndex];
-          if (newsectionData.xus_n && newsectionData.zus_n) {
+          if (newsectionData) {
             traces.push(
               {
                 x: newsectionData.xus_n,
@@ -1087,48 +1184,75 @@ function GeometryModule() {
           style={{ width: isSidePanelOpen ? `${sidePanelWidth}px` : '0px', minWidth: isSidePanelOpen ? `${sidePanelWidth}px` : '0px' }}
         >
           <div className="h-full flex flex-col">
-            {/* Wing Specifications */}
-            <div className="p-4 border-b border-blue-200 bg-blue-50">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Wing Specifications</h3>
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="text-xs font-medium text-gray-600">Aspect Ratio</label>
-                  <input
-                    type="text"
-                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={wingSpecs.aspectRatio}
-                    readOnly
-                  />
+            {/* Controls Panel */}
+            <div className="p-4 flex-1">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Controls</h3>
+              {!selectedGeoFile || selectedSection === -1 ? (
+                <div className="bg-blue-50 border-l-4 border-blue-600 rounded-md w-full text-center py-4 mt-0">
+                  <h3 className="text-sm font-semibold text-blue-700">
+                    No file or section selected
+                  </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="text-xs font-medium text-gray-600">Wing Span</label>
-                  <input
-                    type="text"
-                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={wingSpecs.wingSpan}
-                    readOnly
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="text-xs font-medium text-gray-600">Number of Sections</label>
-                  <input
-                    type="text"
-                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={wingSpecs.numSections}
-                    readOnly
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="text-xs font-medium text-gray-600">Taper Ratio</label>
-                  <input
-                    type="text"
-                    className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={wingSpecs.taperRatio}
-                    readOnly
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-600 rounded-md">
+                    <h3 className="text-sm font-semibold text-blue-700 text-center">
+                      {getSelectionInfo()}
+                    </h3>
+                  </div>
+                  <div className="overflow-x-auto mb-4">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-1 px-1 text-xs font-medium text-gray-700">Parameter</th>
+                          <th className="text-center py-1 px-1 text-xs font-medium text-gray-700">Baseline</th>
+                          <th className="text-center py-1 px-1 text-xs font-medium text-gray-700">Modified</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(parameters || { Twist: 0.0, Dihedral: 0.0, YSECT: 0.0, XLE: 0.0, XTE: 0.0, Chord: 0.0 }).map(([key, value]) => (
+                          <tr key={key} className="border-b border-gray-100">
+                            <td className="py-1 px-1 text-xs font-medium text-gray-700">{key}</td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text"
+                                className="w-full px-1 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none"
+                                value={typeof value === "number" ? Number(value).toFixed(3) : value}
+                                readOnly
+                              />
+                            </td>
+                            <td className="py-1 px-1">
+                              <input
+                                type="text"
+                                className="w-full px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                onChange={(e) => handleParameterChange(key, e.target.value)}
+                                value={modifiedParameters[key] ?? ''}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-center gap-2">
+                    <button
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
+                      onClick={computeDesired}
+                    >
+                      Compute Desired
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      onClick={resetAllChanges}
+                      disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
+
             {/* Improve Panel */}
             <div className="p-4 border-b border-blue-200 bg-blue-50">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Improve Sections</h3>
@@ -1234,64 +1358,6 @@ function GeometryModule() {
                 </button>
               </div>
             </div>
-            {/* Controls Panel */}
-            <div className="p-4 flex-1">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Controls</h3>
-              <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-600 rounded-md">
-                <h3 className="text-sm font-semibold text-blue-700 text-center">
-                  {getSelectionInfo()}
-                </h3>
-              </div>
-              <div className="overflow-x-auto mb-4">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-1 px-1 text-xs font-medium text-gray-700">Parameter</th>
-                      <th className="text-center py-1 px-1 text-xs font-medium text-gray-700">Baseline</th>
-                      <th className="text-center py-1 px-1 text-xs font-medium text-gray-700">Modified</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(parameters || { Twist: 0.0, Dihedral: 0.0, YSECT: 0.0, XLE: 0.0, XTE: 0.0, Chord: 0.0 }).map(([key, value]) => (
-                      <tr key={key} className="border-b border-gray-100">
-                        <td className="py-1 px-1 text-xs font-medium text-gray-700">{key}</td>
-                        <td className="py-1 px-1">
-                          <input
-                            type="text"
-                            className="w-full px-1 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none"
-                            value={typeof value === "number" ? Number(value).toFixed(3) : value}
-                            readOnly
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <input
-                            type="text"
-                            className="w-full px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            onChange={(e) => handleParameterChange(key, e.target.value)}
-                            value={modifiedParameters[key] ?? ''}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex justify-center gap-2">
-                <button
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg"
-                  onClick={computeDesired}
-                >
-                  Compute Desired
-                </button>
-                <button
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  onClick={resetAllChanges}
-                  disabled={!selectedGeoFile || (!selectedGeoFile.modifiedGeoData && !selectedGeoFile.modifiedPlotData)}
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
           </div>
           {/* Resize Handle */}
           {isSidePanelOpen && (
@@ -1357,6 +1423,60 @@ function GeometryModule() {
           className="bg-white border-l border-blue-200 flex flex-col overflow-y-auto absolute top-0 right-0 h-full z-10"
           style={{ width: '320px', minWidth: '320px' }}
         >
+
+          {/* Wing Specifications - moved to top of right panel */}
+          <div className="p-4 border-b border-blue-200 bg-blue-50">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Wing Specifications</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2">
+                <label className="text-xs font-medium text-gray-600">Aspect Ratio</label>
+                <input
+                  type="text"
+                  className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={Number(wingSpecs.aspectRatio).toFixed(3)}
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <label className="text-xs font-medium text-gray-600">Wing Span</label>
+                <input
+                  type="text"
+                  className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={Number(wingSpecs.wingSpan).toFixed(4)}
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <label className="text-xs font-medium text-gray-600">Wing Area</label>
+                <input
+                  type="text"
+                  className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={Number(wingSpecs.wingArea).toFixed(4)}
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <label className="text-xs font-medium text-gray-600">Number of Sections</label>
+                <input
+                  type="text"
+                  className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={wingSpecs.numSections}
+                  readOnly
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <label className="text-xs font-medium text-gray-600">Taper Ratio</label>
+                <input
+                  type="text"
+                  className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={Number(wingSpecs.taperRatio).toFixed(4)}
+                  readOnly
+                />
+              </div>
+            </div>
+          </div>
+          {/* Plot Options Panel - now below Wing Specifications */}
+
           <div className="p-4 border-b border-blue-200 bg-blue-50">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Plot Options</h3>
             {geoFiles.length > 0 && (
@@ -1409,12 +1529,10 @@ function GeometryModule() {
                         onChange={handlePlanformToggle}
                         className="sr-only"
                       />
-                      <div className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'
-                        } ${selectedSection !== -1 ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-6' : ''
-                          }`} />
+                      <div className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${planformView ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${planformView ? 'transform translate-x-6' : ''}`} />
                       </div>
-                      <span className={`ml-3 text-sm font-medium ${selectedSection !== -1 ? 'text-gray-400' : 'text-gray-700'} whitespace-nowrap`}>
+                      <span className="ml-3 text-sm font-medium text-gray-700 whitespace-nowrap">
                         Planform View
                       </span>
                     </label>

@@ -92,7 +92,7 @@ cd VFP-Python
 # Create virtual environment
 python -m venv venv
 
-# Activate virtual environment (Make Sure the venv is activated everytime you start the backend server)
+# Activate virtual environment
 # On Windows:
 venv\Scripts\activate
 # On macOS/Linux:
@@ -107,7 +107,7 @@ pip install -r requirements.txt
 **Step 1: Start the Backend Server**
 ```bash
 cd VFP-Python
-# Activate virtual environment
+# Activate virtual environment (Make Sure the venv is activated everytime you start the backend server)
 venv\Scripts\activate  # On Windows
 # or
 source venv/bin/activate  # On macOS/Linux

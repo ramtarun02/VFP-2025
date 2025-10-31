@@ -325,7 +325,6 @@ function PostProcessing() {
     generatePlotData();
   }, [generatePlotData]);
 
-  // --- Spanwise Plot Generation ---
   const generateSpanwisePlotData = useCallback(() => {
     if (selectedLevel && selectedSpanwiseCoeff && parsedCpData && showSpanwiseDistribution) {
       if (!parsedCpData.levels || !parsedCpData.levels[selectedLevel]) return;
@@ -337,18 +336,36 @@ function PostProcessing() {
       const coeffValues = [];
       let loadValues = [];
       let maxY = 0;
+      let chordValues = [];
 
       Object.values(sections).forEach((section) => {
         if (section.coefficients) {
           const yave = section.coefficients.YAVE;
+          const chord = section.coefficients.CHORD || section.chord || 1;
           if (yave !== undefined && Math.abs(yave) > maxY) maxY = Math.abs(yave);
 
+          if (selectedSpanwiseCoeff === 'Load') {
+            chordValues.push(chord);
+          }
+        }
+      });
+
+      // Calculate mean chord for normalization
+      const meanChord = chordValues.length > 0
+        ? chordValues.reduce((a, b) => a + b, 0) / chordValues.length
+        : 1;
+
+      Object.values(sections).forEach((section) => {
+        if (section.coefficients) {
+          const yave = section.coefficients.YAVE;
           let coeff;
           if (selectedSpanwiseCoeff === 'Load') {
-            // Load = CL * CHORD (if available, else fallback to 1)
+            // Load = CL * CHORD / meanChord
             const cl = section.coefficients.CL;
             const chord = section.coefficients.CHORD || section.chord || 1;
-            coeff = (cl !== undefined && chord !== undefined) ? cl * chord : undefined;
+            coeff = (cl !== undefined && chord !== undefined && meanChord !== 0)
+              ? cl * chord / meanChord
+              : undefined;
             loadValues.push(coeff);
           } else {
             coeff = section.coefficients[selectedSpanwiseCoeff];
@@ -417,6 +434,7 @@ function PostProcessing() {
       });
     }
   }, [selectedLevel, selectedSpanwiseCoeff, parsedCpData, showSpanwiseDistribution]);
+
 
   useEffect(() => {
     generateSpanwisePlotData();
